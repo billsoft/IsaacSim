@@ -20,6 +20,7 @@ import os
 import stat
 import time
 import hashlib
+import json
 from typing import Any, Callable, Union
 
 
@@ -28,6 +29,51 @@ RENAME_RETRY_DELAY = 0.1
 
 logging.basicConfig(level=logging.WARNING, format="%(message)s")
 logger = logging.getLogger("install_package")
+
+
+def load_retry_config():
+    """Load retry configuration from config file or environment variables"""
+    config = {
+        "download_retry_count": 1000,
+        "download_retry_delay": 600,
+        "rename_retry_count": RENAME_RETRY_COUNT,
+        "rename_retry_delay": RENAME_RETRY_DELAY
+    }
+    
+    # Try to load from config file first
+    config_path = os.path.join(os.path.dirname(__file__), "..", "retry_config.json")
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                file_config = json.load(f)
+                config.update(file_config)
+                logger.info(f"Loaded retry config from {config_path}")
+    except Exception as e:
+        logger.warning(f"Failed to load retry config from file: {e}")
+    
+    # Override with environment variables if present
+    env_retry_count = os.getenv("PACKMAN_DOWNLOAD_RETRY_COUNT")
+    env_retry_delay = os.getenv("PACKMAN_DOWNLOAD_RETRY_DELAY")
+    
+    if env_retry_count:
+        try:
+            config["download_retry_count"] = int(env_retry_count)
+            logger.info(f"Using download retry count from environment: {env_retry_count}")
+        except ValueError:
+            logger.warning(f"Invalid PACKMAN_DOWNLOAD_RETRY_COUNT: {env_retry_count}")
+    
+    if env_retry_delay:
+        try:
+            config["download_retry_delay"] = float(env_retry_delay)
+            logger.info(f"Using download retry delay from environment: {env_retry_delay}")
+        except ValueError:
+            logger.warning(f"Invalid PACKMAN_DOWNLOAD_RETRY_DELAY: {env_retry_delay}")
+    
+    return config
+
+
+# Load configuration at module level
+_retry_config = load_retry_config()
 
 
 def remove_directory_item(path):
@@ -100,8 +146,31 @@ def rename_folder(staging_dir: StagingDirectory, folder_name: str):
 
 
 def call_with_retry(
-    op_name: str, func: Callable, retry_count: int = 3, retry_delay: float = 20
+    op_name: str, func: Callable, retry_count: int = None, retry_delay: float = None, operation_type: str = "default"
 ) -> Any:
+    """
+    Call a function with retry logic.
+    
+    Args:
+        op_name: Name of the operation for logging
+        func: Function to call
+        retry_count: Number of retries (None to use config)
+        retry_delay: Delay between retries in seconds (None to use config)
+        operation_type: Type of operation ("download", "rename", or "default")
+    """
+    # Use configuration values if not explicitly provided
+    if retry_count is None or retry_delay is None:
+        if operation_type == "download":
+            retry_count = retry_count or _retry_config["download_retry_count"]
+            retry_delay = retry_delay or _retry_config["download_retry_delay"]
+        elif operation_type == "rename":
+            retry_count = retry_count or _retry_config["rename_retry_count"]
+            retry_delay = retry_delay or _retry_config["rename_retry_delay"]
+        else:
+            # Default fallback
+            retry_count = retry_count or 1000
+            retry_delay = retry_delay or 600
+    
     retries_left = retry_count
     while True:
         try:
@@ -126,8 +195,7 @@ def rename_folder_with_retry(staging_dir: StagingDirectory, folder_name):
     call_with_retry(
         f"rename {staging_dir.get_temp_folder_path()} -> {dst_path}",
         lambda: rename_folder(staging_dir, folder_name),
-        RENAME_RETRY_COUNT,
-        RENAME_RETRY_DELAY,
+        operation_type="rename"
     )
 
 

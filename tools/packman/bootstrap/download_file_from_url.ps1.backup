@@ -20,8 +20,8 @@ param(
 )
 $filename = $output
 
-$triesLeft = 1000
-$delay = 10
+$triesLeft = 4
+$delay = 2
 do
 {
     $triesLeft -= 1

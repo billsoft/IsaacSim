@@ -88,7 +88,7 @@ main() {
     execute_with_retry()
     {
         local CMD="$1"
-        local MAX_TRIES=4
+        local MAX_TRIES=1000
         local DELAY=2
         local TRIES=0
         local exit_code

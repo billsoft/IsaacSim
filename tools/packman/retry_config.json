@@ -1,0 +1,12 @@
+{
+    "download_retry_count": 1000,
+    "download_retry_delay": 600,
+    "rename_retry_count": 100,
+    "rename_retry_delay": 0.1,
+    "description": {
+        "download_retry_count": "Number of retries for download operations",
+        "download_retry_delay": "Delay between download retries in seconds (600 = 10 minutes)",
+        "rename_retry_count": "Number of retries for file rename operations",
+        "rename_retry_delay": "Delay between rename retries in seconds"
+    }
+}
