@@ -30,14 +30,14 @@ name = "isaacsim.asset.browser"
 [settings]
 # Root folder URLs to list and monitor.
 exts."isaacsim.asset.browser".folders = [
-    "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Robots",
-    "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Environments",
-    "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/IsaacLab",
-    "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Materials",
-    "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/People",
-    "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Props",
-    "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Samples",
-    "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Sensors",
+    "D:/code/IsaacLab/Assets/Isaac/5.1/Isaac/Robots",
+    "D:/code/IsaacLab/Assets/Isaac/5.1/Isaac/Environments",
+    "D:/code/IsaacLab/Assets/Isaac/5.1/Isaac/IsaacLab",
+    "D:/code/IsaacLab/Assets/Isaac/5.1/Isaac/Materials",
+    "D:/code/IsaacLab/Assets/Isaac/5.1/Isaac/People",
+    "D:/code/IsaacLab/Assets/Isaac/5.1/Isaac/Props",
+    "D:/code/IsaacLab/Assets/Isaac/5.1/Isaac/Samples",
+    "D:/code/IsaacLab/Assets/Isaac/5.1/Isaac/Sensors",
 ]
 # List of asset categories that can be dragged from the browser to the viewport window.
 exts."isaacsim.asset.browser".instanceable = []
