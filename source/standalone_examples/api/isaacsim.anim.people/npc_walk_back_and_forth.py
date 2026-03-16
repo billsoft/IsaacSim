@@ -192,12 +192,20 @@ def generate_command_file(num_characters: int, walk_distance: float, num_loops: 
             lines.append(f"{name} GoTo {x_b:.1f} {y:.1f} 0.0 0")
             lines.append(f"{name} GoTo {x_a:.1f} {y:.1f} 0.0 180")
 
-    cmd_file = os.path.join(tempfile.gettempdir(), "npc_walk_commands.txt")
+    # Use relative path for IRA compatibility (config and cmd files in same temp dir)
+    temp_dir = tempfile.gettempdir()
+    cmd_file = os.path.join(temp_dir, "npc_walk_commands.txt")
     with open(cmd_file, "w") as f:
         f.write("\n".join(lines))
 
+    # Also create empty robot command file to prevent IRA validation error
+    robot_cmd_file = os.path.join(temp_dir, "npc_robot_commands.txt")
+    with open(robot_cmd_file, "w") as f:
+        f.write("")  # Empty file
+
     print(f"[NPC Demo] Command file written to: {cmd_file}")
-    return cmd_file
+    # Return relative path for IRA (relative to config file)
+    return "npc_walk_commands.txt"
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +217,8 @@ def generate_config_file(num_characters: int, command_file: str) -> str:
     # e.g. ".../Isaac/People/Characters/" which contains F_Business_02/, M_Medical_01/, etc.
     char_folder = f"{ASSETS_ROOT}/Isaac/People/Characters/"
     # Ensure all paths use forward slashes (Windows backslash breaks YAML)
-    cmd_file_fwd = command_file.replace("\\", "/")
+    # command_file is now relative path, no need to replace separators
+    cmd_file_fwd = command_file
     scene_fwd = SCENE_USD.replace("\\", "/")
     char_fwd = char_folder.replace("\\", "/")
 
@@ -228,7 +237,7 @@ def generate_config_file(num_characters: int, command_file: str) -> str:
         "  robot:\n"
         "    nova_carter_num: 0\n"
         "    iw_hub_num: 0\n"
-        "    command_file: \"\"\n"
+        "    command_file: npc_robot_commands.txt\n"
         "  sensor:\n"
         "    camera_num: 0\n"
         "  replicator:\n"
@@ -236,7 +245,9 @@ def generate_config_file(num_characters: int, command_file: str) -> str:
         "    parameters:\n"
         "      rgb: false\n"
     )
-    config_file = os.path.join(tempfile.gettempdir(), "npc_walk_config.yaml")
+    # Both config and command files will be in the same temp directory
+    temp_dir = tempfile.gettempdir()
+    config_file = os.path.join(temp_dir, "npc_walk_config.yaml")
     with open(config_file, "w") as f:
         f.write(config)
 
