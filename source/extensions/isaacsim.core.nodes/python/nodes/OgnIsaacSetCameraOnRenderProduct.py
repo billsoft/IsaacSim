@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,21 +13,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import carb
+"""Assign an OmniGraph camera prim input to a render product or viewport."""
+
+from typing import Any
+
 import omni
-from isaacsim.core.utils.render_product import set_camera_prim_path
+from isaacsim.core.rendering_manager import ViewportManager
 
 
 class OgnIsaacSetCameraOnRenderProduct:
-    """
-    Isaac Sim Set Camera On Render Product
-    """
+    """Isaac Sim Set Camera On Render Product."""
 
     @staticmethod
-    def compute(db) -> bool:
+    def compute(db: Any) -> bool:
+        """Set the render product camera and enable `execOut`, or fail when no camera prim is provided.
+
+        Args:
+            db: OmniGraph database for this node.
+
+        Returns:
+            True when the camera is assigned, False otherwise.
+        """
         if len(db.inputs.cameraPrim) == 0:
             db.log_error(f"Camera prim must be specified")
             return False
-        set_camera_prim_path(db.inputs.renderProductPath, db.inputs.cameraPrim[0].GetString())
+        ViewportManager.set_camera(
+            db.inputs.cameraPrim[0].GetString(), render_product_or_viewport=db.inputs.renderProductPath
+        )
         db.outputs.execOut = omni.graph.core.ExecutionAttributeState.ENABLED
         return True

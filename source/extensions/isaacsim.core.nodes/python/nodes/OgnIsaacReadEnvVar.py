@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,20 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
+"""Read an operating-system environment variable into an OmniGraph string output."""
 
-import numpy
-import omni
+import os
+from typing import Any
 
 
 class OgnIsaacReadEnvVar:
-    """
-    look for environment variable on OS, and return it.
-    """
+    """look for environment variable on OS, and return it."""
 
     @staticmethod
-    def compute(db) -> bool:
+    def compute(db: Any) -> bool:
+        """Write the environment variable value, or an empty string when the input or variable is empty.
 
+        Args:
+            db: OmniGraph database for this node.
+
+        Returns:
+            True after the output value is populated.
+        """
         # Empty input case:
         if len(db.inputs.envVar) == 0:
             db.outputs.value = ""

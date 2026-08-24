@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,363 +13,398 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-import os
-from unittest.mock import patch
+
+"""Verify Replicator annotator and writer augmentation pipelines against golden image outputs."""
+
+import tempfile
+from typing import Any
 
 import carb.settings
-import numpy as np
 import omni.kit
 import omni.usd
-from isaacsim.test.utils.image_comparison import compare_arrays_within_tolerances
-from PIL import Image
+from isaacsim.test.utils.file_validation import validate_folder_contents
+from isaacsim.test.utils.image_comparison import compare_images_in_directories
 
 
 class TestDataAugmentation(omni.kit.test.AsyncTestCase):
+    """Exercises NumPy and Warp augmentations applied directly to annotators and through BasicWriter."""
 
-    RGB_MEAN_DIFF_TOLERANCE = 100
-    DEPTH_MEAN_DIFF_TOLERANCE = 5
-    NUM_FRAMES = 2
-    SEED = 12
+    # Per-channel mean-diff tolerances. Bit-stable augmentations (annotator RGB channel
+    # swap) stay close to the golden, while noisy augmentations (gaussian noise on RGB
+    # or depth, amplified for depth by the min/max normalization in convert_depth_to_uint8)
+    # accumulate larger per-pixel deltas.
+    NO_NOISE_MEAN_DIFF_TOLERANCE = 5
+    NOISE_MEAN_DIFF_TOLERANCE = 30
 
-    async def setUp(self):
+    async def setUp(self) -> None:
+        """Create a fresh stage and preserve DLSS quality settings for augmentation captures."""
         await omni.kit.app.get_app().next_update_async()
         omni.usd.get_context().new_stage()
         await omni.kit.app.get_app().next_update_async()
         self.original_dlss_exec_mode = carb.settings.get_settings().get("rtx/post/dlss/execMode")
 
-    async def tearDown(self):
+    async def tearDown(self) -> Any:
+        """Close the stage, wait for pending loads, and restore the previous DLSS setting.
+
+        Returns:
+            None.
+        """
+        omni.usd.get_context().close_stage()
         await omni.kit.app.get_app().next_update_async()
-        omni.usd.get_context().new_stage()
-        await omni.kit.app.get_app().next_update_async()
+        while omni.usd.get_context().get_stage_loading_status()[2] > 0:
+            await omni.kit.app.get_app().next_update_async()
         carb.settings.get_settings().set("rtx/post/dlss/execMode", self.original_dlss_exec_mode)
 
-    # Compare PNG files with the specified prefix using mean pixel difference
-    def compare_images_with_mean_diff(self, golden_dir, test_dir, prefix, tolerance):
-        print(f"Comparing {prefix} images with mean difference tolerance: {tolerance}")
-        # Get the list of .png files matching the prefix
-        golden_files = sorted([f for f in os.listdir(golden_dir) if f.startswith(prefix) and f.endswith(".png")])
-        test_files = sorted([f for f in os.listdir(test_dir) if f.startswith(prefix) and f.endswith(".png")])
+    async def test_data_augmentation_annotator(self) -> Any:
+        """Capture augmented annotator data and compare RGB/depth images for NumPy and Warp paths.
 
-        # Ensure the file lists match
-        self.assertListEqual(
-            golden_files,
-            test_files,
-            f"File names mismatch for {prefix}*.png: {golden_files} in golden_dir vs {test_files} in test_dir.",
-        )
-
-        # Iterate over the matching .png files and compare them using image comparison utilities
-        for file_name in golden_files:
-            golden_file_path = os.path.join(golden_dir, file_name)
-            test_file_path = os.path.join(test_dir, file_name)
-
-            # Open images and convert to arrays
-            golden_image = Image.open(golden_file_path)
-            test_image = Image.open(test_file_path)
-            golden_array = np.array(golden_image)
-            test_array = np.array(test_image)
-
-            # Use comprehensive comparison utilities
-            stdout_capture = io.StringIO()
-            with patch("sys.stdout", stdout_capture):
-                result = compare_arrays_within_tolerances(
-                    golden_array,
-                    test_array,
-                    allclose_rtol=None,  # Disable allclose for this test
-                    allclose_atol=None,
-                    mean_tolerance=tolerance,
-                    print_all_stats=True,
-                )
-
-            # Only print detailed stats on failure to keep logs clean
-            if not result["passed"]:
-                captured_output = stdout_capture.getvalue()
-                print(f"\t'{file_name}': FAILED comparison")
-                print(captured_output)
-            else:
-                print(f"\t'{file_name}': PASSED (mean_diff={result['metrics']['mean_abs']:.3f})")
-
-            self.assertTrue(
-                result["passed"],
-                f"Mean difference comparison failed for {file_name}. "
-                f"Expected mean_diff <= {tolerance}, got {result['metrics']['mean_abs']:.3f}.\n"
-                f"Detailed statistics:\n{stdout_capture.getvalue()}",
-            )
-
-    # Compare .npy files with the specified prefix
-    def compare_npy_files(self, golden_dir, test_dir, prefix, mean_diff_tolerance=None, rtol=1.0e-5, atol=1.0e-8):
-        comparison_method = "mean_diff" if mean_diff_tolerance is not None else "allclose"
-        tolerance_str = (
-            f"mean_diff_tolerance: {mean_diff_tolerance}"
-            if mean_diff_tolerance is not None
-            else f"rtol: {rtol}, atol: {atol}"
-        )
-        print(f"Comparing {prefix} npy files using {comparison_method} with {tolerance_str}")
-
-        # Get the list of .npy files matching the prefix
-        golden_files = sorted([f for f in os.listdir(golden_dir) if f.startswith(prefix) and f.endswith(".npy")])
-        test_files = sorted([f for f in os.listdir(test_dir) if f.startswith(prefix) and f.endswith(".npy")])
-
-        # Ensure the file lists match
-        self.assertListEqual(
-            golden_files,
-            test_files,
-            f"File names mismatch for {prefix}*.npy: {golden_files} in golden_dir vs {test_files} in test_dir.",
-        )
-
-        # Compare the content of each file using comprehensive comparison utilities
-        for file_name in golden_files:
-            golden_file_path = os.path.join(golden_dir, file_name)
-            test_file_path = os.path.join(test_dir, file_name)
-
-            # Load numpy data
-            golden_data = np.load(golden_file_path)
-            test_data = np.load(test_file_path)
-
-            # Use comprehensive comparison utilities
-            stdout_capture = io.StringIO()
-            with patch("sys.stdout", stdout_capture):
-                if mean_diff_tolerance is not None:
-                    # Use mean difference comparison
-                    result = compare_arrays_within_tolerances(
-                        golden_data,
-                        test_data,
-                        allclose_rtol=None,  # Disable allclose for mean diff comparison
-                        allclose_atol=None,
-                        mean_tolerance=mean_diff_tolerance,
-                        print_all_stats=True,
-                    )
-                else:
-                    # Use allclose comparison
-                    result = compare_arrays_within_tolerances(
-                        golden_data,
-                        test_data,
-                        allclose_rtol=rtol,
-                        allclose_atol=atol,
-                        print_all_stats=True,
-                    )
-
-            # Only print detailed stats on failure to keep logs clean
-            if not result["passed"]:
-                captured_output = stdout_capture.getvalue()
-                print(f"\t'{file_name}': FAILED comparison")
-                print(captured_output)
-            else:
-                if mean_diff_tolerance is not None:
-                    print(f"\t'{file_name}': PASSED (mean_diff={result['metrics']['mean_abs']:.6f})")
-                else:
-                    print(f"\t'{file_name}': PASSED (allclose with rtol={rtol}, atol={atol})")
-
-            # Assert with detailed error message
-            if mean_diff_tolerance is not None:
-                self.assertTrue(
-                    result["passed"],
-                    f"Mean difference comparison failed for {file_name}. "
-                    f"Expected mean_diff <= {mean_diff_tolerance}, got {result['metrics']['mean_abs']:.6f}.\n"
-                    f"Detailed statistics:\n{stdout_capture.getvalue()}",
-                )
-            else:
-                self.assertTrue(
-                    result["passed"],
-                    f"Allclose comparison failed for {file_name} with rtol={rtol}, atol={atol}.\n"
-                    f"Detailed statistics:\n{stdout_capture.getvalue()}",
-                )
-
-    async def run_annotator_augmentation_async(self, out_subdir: str, num_frames: int, use_warp: bool, seed: int):
+        Returns:
+            None.
+        """
         import asyncio
         import os
         import time
 
         import carb.settings
         import numpy as np
-        import omni
         import omni.replicator.core as rep
         import warp as wp
-        from isaacsim.core.utils.stage import open_stage
-        from isaacsim.storage.native import get_assets_root_path
-        from PIL import Image
+        from isaacsim.core.experimental.utils.stage import open_stage
+        from isaacsim.storage.native import get_assets_root_path_async
+        from omni.replicator.core.functional import write_image
 
-        rep.set_global_seed(seed)
-
+        NUM_FRAMES = 5
+        RESOLUTION = (512, 512)
+        USE_WARP = False
         ENV_URL = "/Isaac/Environments/Grid/default_environment.usd"
+        SEED = 42
 
-        # Enable scripts
+        annot_test_root = tempfile.mkdtemp(prefix="test_augm_annot_")
+        print(f"Test output root: {annot_test_root}")
+
+        # Enable warp scripts
         carb.settings.get_settings().set_bool("/app/omni.graph.scriptnode/opt_in", True)
 
-        # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
-        carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+        def rgb_to_bgr_np(data_in: np.ndarray) -> np.ndarray:
+            """Swap RGBA red and blue channels using NumPy (CPU).
 
-        # Illustrative augmentation switching red and blue channels in rgb data using numpy (CPU) and warp (GPU)
-        def rgb_to_bgr_np(data_in):
+            Args:
+                data_in: Input RGBA image data to modify.
+
+            Returns:
+                Input image data with red and blue channels swapped.
+            """
             data_in[:, :, [0, 2]] = data_in[:, :, [2, 0]]
             return data_in
 
         @wp.kernel
-        def rgb_to_bgr_wp(data_in: wp.array3d(dtype=wp.uint8), data_out: wp.array3d(dtype=wp.uint8)):
+        def rgb_to_bgr_wp(data_in: wp.array3d(dtype=wp.uint8), data_out: wp.array3d(dtype=wp.uint8)) -> None:
+            """Swap RGBA red and blue channels using Warp (GPU).
+
+            Args:
+                data_in: Input RGBA image data.
+                data_out: Output RGBA image data.
+            """
             i, j = wp.tid()
             data_out[i, j, 0] = data_in[i, j, 2]
             data_out[i, j, 1] = data_in[i, j, 1]
             data_out[i, j, 2] = data_in[i, j, 0]
             data_out[i, j, 3] = data_in[i, j, 3]
 
-        # Gaussian noise augmentation on depth data in numpy (CPU) and warp (GPU)
-        def gaussian_noise_depth_np(data_in, sigma: float, seed: int):
+        def gaussian_noise_depth_np(data_in: np.ndarray, sigma: float, seed: int) -> np.ndarray:
+            """Add Gaussian noise to depth values using NumPy (CPU).
+
+            Args:
+                data_in: Input depth data.
+                sigma: Standard deviation of the Gaussian noise.
+                seed: Random seed used for noise generation.
+
+            Returns:
+                Depth data with clipped Gaussian noise applied.
+            """
             np.random.seed(seed)
             result = data_in.astype(np.float32) + np.random.randn(*data_in.shape) * sigma
             return np.clip(result, 0, None).astype(data_in.dtype)
 
-        rep.AnnotatorRegistry.register_augmentation(
-            "gn_depth_np", rep.annotators.Augmentation.from_function(gaussian_noise_depth_np, sigma=0.1, seed=seed)
+        rep.annotators.register_augmentation(
+            "gn_depth_np", rep.annotators.Augmentation.from_function(gaussian_noise_depth_np, sigma=0.1, seed=SEED)
         )
 
         @wp.kernel
         def gaussian_noise_depth_wp(
             data_in: wp.array2d(dtype=wp.float32), data_out: wp.array2d(dtype=wp.float32), sigma: float, seed: int
-        ):
+        ) -> None:
+            """Add Gaussian noise to depth values using Warp (GPU).
+
+            Args:
+                data_in: Input depth data.
+                data_out: Output depth data.
+                sigma: Standard deviation of the Gaussian noise.
+                seed: Random seed used for noise generation.
+            """
             i, j = wp.tid()
             # Unique ID for random seed per pixel
             scalar_pixel_id = i * data_in.shape[1] + j
             state = wp.rand_init(seed, scalar_pixel_id)
             data_out[i, j] = data_in[i, j] + sigma * wp.randn(state)
 
-        rep.AnnotatorRegistry.register_augmentation(
-            "gn_depth_wp", rep.annotators.Augmentation.from_function(gaussian_noise_depth_wp, sigma=0.1, seed=seed)
+        rep.annotators.register_augmentation(
+            "gn_depth_wp", rep.annotators.Augmentation.from_function(gaussian_noise_depth_wp, sigma=0.1, seed=SEED)
         )
 
-        # Helper functions for writing images from annotator data
-        def write_rgb(data, path):
-            rgb_img = Image.fromarray(data).convert("RGBA")
-            rgb_img.save(path + ".png")
+        def convert_depth_to_uint8(data: Any) -> Any:
+            """Normalize depth data and convert it to uint8 grayscale.
 
-        def write_depth(data, path):
-            # Convert to numpy (if warp), normalize, handle any nan values, and convert to from float32 to 8-bit int array
+            Args:
+                data: Depth data to normalize.
+
+            Returns:
+                Normalized grayscale depth data.
+            """
             if isinstance(data, wp.array):
                 data = data.numpy()
-            # Replace any -inf and inf values with nan, then calculate the mean value and replace nan with the mean
-            data[np.isinf(data)] = np.nan
-            data = np.nan_to_num(data, nan=np.nanmean(data), copy=False)
-            normalized_array = (data - np.min(data)) / (np.max(data) - np.min(data))
-            integer_array = (normalized_array * 255).astype(np.uint8)
-            depth_img = Image.fromarray(integer_array).convert("L")
-            depth_img.save(path + ".png")
+            depth = data.astype(np.float32, copy=False)
+            depth[np.isinf(depth)] = np.nan
+            mean_val = np.nanmean(depth)
+            if np.isnan(mean_val):
+                mean_val = 0.0
+            depth = np.nan_to_num(depth, nan=mean_val, copy=False)
+            min_val = depth.min()
+            max_val = depth.max()
+            if max_val <= min_val:
+                return np.zeros(depth.shape, dtype=np.uint8)
+            normalized = (depth - min_val) / (max_val - min_val)
+            return (normalized * 255.0).astype(np.uint8)
 
-        # Setup the environment
-        assets_root_path = get_assets_root_path()
-        open_stage(assets_root_path + ENV_URL)
+        async def run_example_async(
+            num_frames: int, resolution: tuple[int, int], use_warp: bool, env_url: str | None = None
+        ) -> float:
+            """Randomize a cube, read augmented RGB/depth annotators, and write normalized images.
 
-        # Disable capture on play and async rendering
-        carb.settings.get_settings().set("/omni/replicator/captureOnPlay", False)
-        carb.settings.get_settings().set("/omni/replicator/asyncRendering", False)
-        carb.settings.get_settings().set("/app/asyncRendering", False)
+            Args:
+                num_frames: Number of frames to capture.
+                resolution: Render product resolution.
+                use_warp: Whether to use Warp augmentations.
+                env_url: Asset-relative environment URL to open, or None to create a simple scene.
 
-        # Create a red cube and a render product from a camera looking at the cube from the top
-        red_mat = rep.create.material_omnipbr(diffuse=(1, 0, 0))
-        red_cube = rep.create.cube(position=(0, 0, 0.71), material=red_mat)
-        cam = rep.create.camera(position=(0, 0, 5), look_at=(0, 0, 0))
-        rp = rep.create.render_product(cam, (512, 512))
+            Returns:
+                Capture duration in seconds.
+            """
+            print(f"Running example with num_frames: {num_frames}, resolution: {resolution}, use_warp: {use_warp}")
 
-        # Get the local augmentations, either from function or from the registry
-        rgb_to_bgr_augm = None
-        gn_depth_augm = None
-        if use_warp:
-            rgb_to_bgr_augm = rep.annotators.Augmentation.from_function(rgb_to_bgr_wp)
-            gn_depth_augm = rep.AnnotatorRegistry.get_augmentation("gn_depth_wp")
-        else:
-            rgb_to_bgr_augm = rep.annotators.Augmentation.from_function(rgb_to_bgr_np)
-            gn_depth_augm = rep.AnnotatorRegistry.get_augmentation("gn_depth_np")
+            if env_url is not None and env_url != "":
+                assets_root_path = await get_assets_root_path_async()
+                stage_path = assets_root_path + env_url
+                print(f"Opening stage: {stage_path}")
+                open_stage(stage_path)
+            else:
+                await omni.usd.get_context().new_stage_async()
+                rep.functional.create.dome_light(intensity=1000, rotation=(270, 0, 0))
+                ground_plane = rep.functional.create.plane(scale=(10, 10, 1), position=(0, 0, 0))
+                rep.functional.physics.apply_collider(ground_plane)
 
-        # Output directories
-        out_dir = os.path.join(os.getcwd(), out_subdir)
-        print(f"Writing data to: {out_dir}")
-        os.makedirs(out_dir, exist_ok=True)
+            # Use a fixed global seed for reproducibility
+            rep.set_global_seed(SEED)
 
-        # Register the annotator together with its augmentation
-        rep.annotators.register(
-            name="rgb_to_bgr_augm",
-            annotator=rep.annotators.augment(
-                source_annotator=rep.AnnotatorRegistry.get_annotator("rgb"),
+            # Disable capture on play, data is captured manually using the step function
+            rep.orchestrator.set_capture_on_play(False)
+
+            # Set DLSS to Quality mode (2) for best SDG results (Options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+            carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+
+            # Augment the RGB and depth annotators
+            rgb_to_bgr_augm = rep.annotators.Augmentation.from_function(rgb_to_bgr_wp if use_warp else rgb_to_bgr_np)
+            depth_aug = rep.annotators.get_augmentation("gn_depth_wp" if use_warp else "gn_depth_np")
+            rgb_to_bgr_annot = rep.annotators.augment(
+                source_annotator=rep.annotators.get("rgb"),
                 augmentation=rgb_to_bgr_augm,
-            ),
-        )
+            )
+            depth_annot_1 = rep.annotators.get("distance_to_camera")
+            depth_annot_1.augment(depth_aug)
+            depth_annot_2 = rep.annotators.get("distance_to_camera")
+            depth_annot_2.augment(depth_aug, sigma=0.5)
 
-        rgb_to_bgr_annot = rep.AnnotatorRegistry.get_annotator("rgb_to_bgr_augm")
-        depth_annot_1 = rep.AnnotatorRegistry.get_annotator("distance_to_camera")
-        depth_annot_1.augment(gn_depth_augm)
-        depth_annot_2 = rep.AnnotatorRegistry.get_annotator("distance_to_camera")
-        depth_annot_2.augment(gn_depth_augm, sigma=0.5)
+            # Create the render product and attach the annotators to it
+            cam = rep.functional.create.camera(position=(0, 0, 5), look_at=(0, 0, 0))
+            rp = rep.create.render_product(cam, resolution)
+            rgb_to_bgr_annot.attach(rp)
+            depth_annot_1.attach(rp)
+            depth_annot_2.attach(rp)
 
-        rgb_to_bgr_annot.attach(rp)
-        depth_annot_1.attach(rp)
-        depth_annot_2.attach(rp)
+            # Create a red cube and randomize its rotation on a custom event sent before each capture step
+            red_cube = rep.functional.create.cube(position=(0, 0, 0.71))
+            rep.functional.create.material(mdl="OmniPBR.mdl", bind_prims=[red_cube], diffuse_color_constant=(1, 0, 0))
 
-        # Generate a replicator graph to rotate the cube every capture frame
-        with rep.trigger.on_frame():
-            with red_cube:
-                rep.randomizer.rotation()
+            with rep.trigger.on_custom_event(event_name="randomize_red_cube"):
+                red_cube_node = rep.get.prim_at_path(red_cube.GetPath())
+                with red_cube_node:
+                    rep.randomizer.rotation()
 
-        # Evaluate the graph
-        rep.orchestrator.preview()
+            # Output directory
+            out_dir = os.path.join(annot_test_root, f"{'warp' if use_warp else 'numpy'}")
+            print(f"Writing data to: {out_dir}")
+            os.makedirs(out_dir, exist_ok=True)
 
-        # The orchestrator.step() function will trigger the randomization graph and feed annotators with new data
-        async def run_example_async(num_frames):
-            # Wait a few frames for the new stage to fully load
-            for _ in range(10):
-                await omni.kit.app.get_app().next_update_async()
-            # Measure the duration of capturing the data
-            start_time = time.time()
-            for i in range(num_frames):
+            capture_start = time.time()
+            for frame_idx in range(num_frames):
+                print(f"  Capturing frame {frame_idx + 1}/{num_frames}")
+                rep.utils.send_og_event(event_name="randomize_red_cube")
                 await rep.orchestrator.step_async(rt_subframes=32)
+
+                # Get the data from the annotators
                 rgb_data = rgb_to_bgr_annot.get_data()
                 depth_data_1 = depth_annot_1.get_data()
                 depth_data_2 = depth_annot_2.get_data()
-                write_rgb(rgb_data, os.path.join(out_dir, f"annot_rgb_{i}"))
-                write_depth(depth_data_1, os.path.join(out_dir, f"annot_depth_1_{i}"))
-                write_depth(depth_data_2, os.path.join(out_dir, f"annot_depth_2_{i}"))
-            return start_time
 
-        # Run the example
-        start_time = await run_example_async(num_frames)
-        await rep.orchestrator.wait_until_complete_async()
-        print(
-            f"The duration for capturing {num_frames} frames using '{'warp' if use_warp else 'numpy'}' was: {time.time() - start_time:.4f} seconds, with an average of {(time.time() - start_time) / num_frames:.4f} seconds per frame."
-        )
+                # Schedule the write of the data to disk
+                write_image(path=os.path.join(out_dir, f"annot_rgb_{frame_idx}.png"), data=rgb_data)
+                write_image(
+                    path=os.path.join(out_dir, f"annot_depth_1_{frame_idx}.png"),
+                    data=convert_depth_to_uint8(depth_data_1),
+                )
+                write_image(
+                    path=os.path.join(out_dir, f"annot_depth_2_{frame_idx}.png"),
+                    data=convert_depth_to_uint8(depth_data_2),
+                )
 
-    async def run_writer_augmentation_async(self, out_subdir: str, num_frames: int, use_warp: bool, seed: int):
+            # Wait for the data to be written to disk and release resources
+            await rep.orchestrator.wait_until_complete_async()
+            rgb_to_bgr_annot.detach()
+            depth_annot_1.detach()
+            depth_annot_2.detach()
+            rp.destroy()
+
+            return time.time() - capture_start
+
+        def on_task_done(task: asyncio.Task) -> Any:
+            """Report timing information when capture completes.
+
+            Args:
+                task: Completed capture task whose result is the capture duration.
+
+            Returns:
+                None.
+            """
+            duration = task.result()
+            average = duration / NUM_FRAMES if NUM_FRAMES else 0.0
+            mode_label = "warp" if USE_WARP else "numpy"
+            print(
+                f"The duration for capturing {NUM_FRAMES} frames using '{mode_label}' was: {duration:.4f} seconds, "
+                f"with an average of {average:.4f} seconds per frame."
+            )
+
+        # task = asyncio.ensure_future(run_example_async(NUM_FRAMES, RESOLUTION, USE_WARP))
+        # task.add_done_callback(on_task_done)
+
+        test_num_frames = 2
+        for test_use_warp in [False, True]:
+            mode_label = "warp" if test_use_warp else "numpy"
+            golden_dir = os.path.join(
+                os.path.dirname(os.path.realpath(__file__)), "data", "golden", f"_out_augm_annot_{mode_label}"
+            )
+            await run_example_async(
+                num_frames=test_num_frames, resolution=RESOLUTION, use_warp=test_use_warp, env_url=""
+            )
+            out_dir = os.path.join(annot_test_root, mode_label)
+
+            folder_contents_success = validate_folder_contents(
+                path=out_dir, expected_counts={"png": test_num_frames * 3}
+            )
+            self.assertTrue(
+                folder_contents_success, f"Folder contents validation failed ({mode_label}). Output dir: {out_dir}"
+            )
+
+            rgb_result = compare_images_in_directories(
+                golden_dir=golden_dir,
+                test_dir=out_dir,
+                path_pattern=r"^annot_rgb_.*\.png$",
+                allclose_rtol=None,
+                allclose_atol=None,
+                mean_tolerance=self.NO_NOISE_MEAN_DIFF_TOLERANCE,
+                print_all_stats=False,
+            )
+            self.assertTrue(
+                rgb_result["all_passed"],
+                f"RGB image comparison failed ({mode_label}, tol={self.NO_NOISE_MEAN_DIFF_TOLERANCE}). Output dir: {out_dir}",
+            )
+
+            depth_result = compare_images_in_directories(
+                golden_dir=golden_dir,
+                test_dir=out_dir,
+                path_pattern=r"^annot_depth_.*\.png$",
+                allclose_rtol=None,
+                allclose_atol=None,
+                mean_tolerance=self.NOISE_MEAN_DIFF_TOLERANCE,
+                print_all_stats=False,
+            )
+            self.assertTrue(
+                depth_result["all_passed"],
+                f"Depth image comparison failed ({mode_label}, tol={self.NOISE_MEAN_DIFF_TOLERANCE}). Output dir: {out_dir}",
+            )
+
+    async def test_data_augmentation_writer(self) -> Any:
+        """Capture BasicWriter output after composing RGB and depth augmentations on its annotators.
+
+        Returns:
+            None.
+        """
         import asyncio
         import os
         import time
 
         import carb.settings
         import numpy as np
-        import omni
         import omni.replicator.core as rep
         import warp as wp
-        from isaacsim.core.utils.stage import open_stage
-        from isaacsim.storage.native import get_assets_root_path
+        from isaacsim.core.experimental.utils.stage import open_stage
+        from isaacsim.storage.native import get_assets_root_path_async
 
-        rep.set_global_seed(seed)
+        NUM_FRAMES = 5
+        RESOLUTION = (512, 512)
+        USE_WARP = False
         ENV_URL = "/Isaac/Environments/Grid/default_environment.usd"
+        SEED = 42
 
-        # Enable scripts
+        writer_test_root = tempfile.mkdtemp(prefix="test_augm_writer_")
+        print(f"Test output root: {writer_test_root}")
+
+        # Enable warp scripts
         carb.settings.get_settings().set_bool("/app/omni.graph.scriptnode/opt_in", True)
 
-        # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
-        carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+        def gaussian_noise_rgb_np(data_in: np.ndarray, sigma: float, seed: int) -> np.ndarray:
+            """Add Gaussian noise to RGB data using NumPy (CPU).
 
-        # Gaussian noise augmentation on rgba data in numpy (CPU) and warp (GPU)
-        def gaussian_noise_rgb_np(data_in, sigma: float, seed: int):
+            Args:
+                data_in: Input RGB image data.
+                sigma: Standard deviation of the Gaussian noise.
+                seed: Random seed used for noise generation.
+
+            Returns:
+                RGB image data with clipped Gaussian noise applied.
+            """
             np.random.seed(seed)
+            # Convert to float32 space
             data_in = data_in.astype(np.float32)
+            # Add Gaussian noise to each channel
             data_in[:, :, 0] = data_in[:, :, 0] + np.random.randn(*data_in.shape[:-1]) * sigma
             data_in[:, :, 1] = data_in[:, :, 1] + np.random.randn(*data_in.shape[:-1]) * sigma
             data_in[:, :, 2] = data_in[:, :, 2] + np.random.randn(*data_in.shape[:-1]) * sigma
+            # Clip to [0, 255] and convert to uint8
             data_in = np.clip(data_in, 0, 255).astype(np.uint8)
             return data_in
 
         @wp.kernel
         def gaussian_noise_rgb_wp(
             data_in: wp.array3d(dtype=wp.uint8), data_out: wp.array3d(dtype=wp.uint8), sigma: float, seed: int
-        ):
+        ) -> None:
+            """Add Gaussian noise to RGB data using Warp (GPU).
+
+            Args:
+                data_in: Input RGBA image data.
+                data_out: Output RGBA image data.
+                sigma: Standard deviation of the Gaussian noise.
+                seed: Random seed used for noise generation.
+            """
             # Get thread coordinates and image dimensions to calculate unique pixel ID for random generation
             i, j = wp.tid()
             dim_i = data_in.shape[0]
@@ -381,26 +416,48 @@ class TestDataAugmentation(omni.kit.test.AsyncTestCase):
             state_g = wp.rand_init(seed, pixel_id + (dim_i * dim_j * 1))
             state_b = wp.rand_init(seed, pixel_id + (dim_i * dim_j * 2))
 
-            # Apply noise to each channel independently using unique seeds
-            data_out[i, j, 0] = wp.uint8(wp.int32(data_in[i, j, 0]) + wp.int32(sigma * wp.randn(state_r)))
-            data_out[i, j, 1] = wp.uint8(wp.int32(data_in[i, j, 1]) + wp.int32(sigma * wp.randn(state_g)))
-            data_out[i, j, 2] = wp.uint8(wp.int32(data_in[i, j, 2]) + wp.int32(sigma * wp.randn(state_b)))
+            # Apply noise to each channel independently using unique seeds; work in float32 space, then clip and convert to uint8
+            val_r = wp.float32(data_in[i, j, 0]) + sigma * wp.randn(state_r)
+            val_g = wp.float32(data_in[i, j, 1]) + sigma * wp.randn(state_g)
+            val_b = wp.float32(data_in[i, j, 2]) + sigma * wp.randn(state_b)
+
+            # Clip to [0, 255] and convert to uint8
+            data_out[i, j, 0] = wp.uint8(wp.clamp(val_r, 0.0, 255.0))
+            data_out[i, j, 1] = wp.uint8(wp.clamp(val_g, 0.0, 255.0))
+            data_out[i, j, 2] = wp.uint8(wp.clamp(val_b, 0.0, 255.0))
             data_out[i, j, 3] = data_in[i, j, 3]
 
-        # Gaussian noise augmentation on depth data in numpy (CPU) and warp (GPU)
-        def gaussian_noise_depth_np(data_in, sigma: float, seed: int):
+        def gaussian_noise_depth_np(data_in: np.ndarray, sigma: float, seed: int) -> np.ndarray:
+            """Add Gaussian noise to depth values using NumPy (CPU).
+
+            Args:
+                data_in: Input depth data.
+                sigma: Standard deviation of the Gaussian noise.
+                seed: Random seed used for noise generation.
+
+            Returns:
+                Depth data with clipped Gaussian noise applied.
+            """
             np.random.seed(seed)
             result = data_in.astype(np.float32) + np.random.randn(*data_in.shape) * sigma
             return np.clip(result, 0, None).astype(data_in.dtype)
 
         rep.AnnotatorRegistry.register_augmentation(
-            "gn_depth_np", rep.annotators.Augmentation.from_function(gaussian_noise_depth_np, sigma=0.1, seed=seed)
+            "gn_depth_np", rep.annotators.Augmentation.from_function(gaussian_noise_depth_np, sigma=0.1, seed=None)
         )
 
         @wp.kernel
         def gaussian_noise_depth_wp(
             data_in: wp.array2d(dtype=wp.float32), data_out: wp.array2d(dtype=wp.float32), sigma: float, seed: int
-        ):
+        ) -> None:
+            """Add Gaussian noise to depth values using Warp (GPU).
+
+            Args:
+                data_in: Input depth data.
+                data_out: Output depth data.
+                sigma: Standard deviation of the Gaussian noise.
+                seed: Random seed used for noise generation.
+            """
             i, j = wp.tid()
             # Unique ID for random seed per pixel
             scalar_pixel_id = i * data_in.shape[1] + j
@@ -408,144 +465,156 @@ class TestDataAugmentation(omni.kit.test.AsyncTestCase):
             data_out[i, j] = data_in[i, j] + sigma * wp.randn(state)
 
         rep.AnnotatorRegistry.register_augmentation(
-            "gn_depth_wp", rep.annotators.Augmentation.from_function(gaussian_noise_depth_wp, sigma=0.1, seed=seed)
+            "gn_depth_wp", rep.annotators.Augmentation.from_function(gaussian_noise_depth_wp, sigma=0.1, seed=None)
         )
 
-        # Setup the environment
-        assets_root_path = get_assets_root_path()
-        open_stage(assets_root_path + ENV_URL)
+        async def run_example_async(
+            num_frames: int, resolution: tuple[int, int], use_warp: bool, env_url: str | None = None
+        ) -> float:
+            """Randomize a cube and let BasicWriter write augmented RGB and colorized depth data.
 
-        # Disable capture on play and async rendering
-        carb.settings.get_settings().set("/omni/replicator/captureOnPlay", False)
-        carb.settings.get_settings().set("/omni/replicator/asyncRendering", False)
-        carb.settings.get_settings().set("/app/asyncRendering", False)
+            Args:
+                num_frames: Number of frames to capture.
+                resolution: Render product resolution.
+                use_warp: Whether to use Warp augmentations.
+                env_url: Asset-relative environment URL to open, or None to create a simple scene.
 
-        # Create a red cube and a render product from a camera looking at the cube from the top
-        red_mat = rep.create.material_omnipbr(diffuse=(1, 0, 0))
-        red_cube = rep.create.cube(position=(0, 0, 0.71), material=red_mat)
-        cam = rep.create.camera(position=(0, 0, 5), look_at=(0, 0, 0))
-        rp = rep.create.render_product(cam, (512, 512))
+            Returns:
+                Capture duration in seconds.
+            """
+            print(f"Running example with num_frames: {num_frames}, resolution: {resolution}, use_warp: {use_warp}")
 
-        # Access default annotators from replicator
-        rgb_to_hsv_augm = rep.annotators.Augmentation.from_function(rep.augmentations_default.aug_rgb_to_hsv)
-        hsv_to_rgb_augm = rep.annotators.Augmentation.from_function(rep.augmentations_default.aug_hsv_to_rgb)
+            if env_url is not None and env_url != "":
+                assets_root_path = await get_assets_root_path_async()
+                stage_path = assets_root_path + env_url
+                print(f"Opening stage: {stage_path}")
+                open_stage(stage_path)
+            else:
+                await omni.usd.get_context().new_stage_async()
+                rep.functional.create.dome_light(intensity=1000, rotation=(270, 0, 0))
+                ground_plane = rep.functional.create.plane(scale=(10, 10, 1), position=(0, 0, 0))
+                rep.functional.physics.apply_collider(ground_plane)
 
-        # Access the custom annotators as functions or from the registry
-        gn_rgb_augm = None
-        gn_depth_augm = None
-        if use_warp:
-            gn_rgb_augm = rep.annotators.Augmentation.from_function(gaussian_noise_rgb_wp, sigma=6.0, seed=seed)
-            gn_depth_augm = rep.AnnotatorRegistry.get_augmentation("gn_depth_wp")
-        else:
-            gn_rgb_augm = rep.annotators.Augmentation.from_function(gaussian_noise_rgb_np, sigma=6.0, seed=seed)
-            gn_depth_augm = rep.AnnotatorRegistry.get_augmentation("gn_depth_np")
+            # Use a fixed global seed for reproducibility
+            rep.set_global_seed(SEED)
 
-        # Create a writer and apply the augmentations to its corresponding annotators
-        out_dir = os.path.join(os.getcwd(), out_subdir)
-        print(f"Writing data to: {out_dir}")
-        writer = rep.WriterRegistry.get("BasicWriter")
-        writer.initialize(output_dir=out_dir, rgb=True, distance_to_camera=True)
+            # Disable capture on play, data is captured manually using the step function
+            rep.orchestrator.set_capture_on_play(False)
 
-        augmented_rgb_annot = rep.annotators.get("rgb").augment_compose(
-            [rgb_to_hsv_augm, gn_rgb_augm, hsv_to_rgb_augm], name="rgb"
-        )
-        writer.add_annotator(augmented_rgb_annot)
-        writer.augment_annotator("distance_to_camera", gn_depth_augm)
+            # Set DLSS to Quality mode (2) for best SDG results (Options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+            carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
-        # Attach render product to writer
-        writer.attach([rp])
+            # Augment the annotators
+            rgb_to_hsv_augm = rep.annotators.Augmentation.from_function(rep.augmentations_default.aug_rgb_to_hsv)
+            hsv_to_rgb_augm = rep.annotators.Augmentation.from_function(rep.augmentations_default.aug_hsv_to_rgb)
 
-        # Generate a replicator graph randomizing the cube's rotation every frame
-        with rep.trigger.on_frame():
-            with red_cube:
-                rep.randomizer.rotation()
+            # Augment the RGB and depth annotators
+            gn_rgb_augm = rep.annotators.Augmentation.from_function(
+                gaussian_noise_rgb_wp if use_warp else gaussian_noise_rgb_np, sigma=15.0, seed=SEED
+            )
+            gn_depth_augm = rep.annotators.get_augmentation("gn_depth_wp" if use_warp else "gn_depth_np")
 
-        # Evaluate the graph
-        rep.orchestrator.preview()
+            # Create a writer and apply the augmentations to its corresponding annotators
+            out_dir = os.path.join(writer_test_root, f"{'warp' if use_warp else 'numpy'}")
+            os.makedirs(out_dir)
+            backend = rep.backends.get("DiskBackend")
+            backend.initialize(output_dir=out_dir)
+            print(f"Writing data to: {out_dir}")
+            writer = rep.writers.get("BasicWriter")
+            writer.initialize(backend=backend, rgb=True, distance_to_camera=True, colorize_depth=True)
 
-        # The `step()` function will trigger the randomization graph and the writers
-        async def run_example_async(num_frames):
-            # Wait a few frames for the new stage to fully load
-            for _ in range(10):
-                await omni.kit.app.get_app().next_update_async()
-            # Measure the duration of capturing the data
-            start_time = time.time()
-            for _ in range(num_frames):
+            # Apply the augmentations to the RGB and depth annotators
+            augmented_rgb_annot = rep.annotators.get("rgb").augment_compose(
+                [rgb_to_hsv_augm, gn_rgb_augm, hsv_to_rgb_augm], name="rgb"
+            )
+            writer.add_annotator(augmented_rgb_annot)
+            writer.augment_annotator("distance_to_camera", gn_depth_augm)
+
+            # Create a camera and a render product and attach them to the writer
+            cam = rep.functional.create.camera(position=(0, 0, 5), look_at=(0, 0, 0))
+            rp = rep.create.render_product(cam, resolution)
+            writer.attach(rp)
+
+            # Create a red cube and randomize its rotation on a custom event sent before each capture step
+            red_cube = rep.functional.create.cube(position=(0, 0, 0.71))
+            rep.functional.create.material(mdl="OmniPBR.mdl", bind_prims=[red_cube], diffuse_color_constant=(1, 0, 0))
+            with rep.trigger.on_custom_event(event_name="randomize_red_cube"):
+                red_cube_node = rep.get.prim_at_path(red_cube.GetPath())
+                with red_cube_node:
+                    rep.randomizer.rotation()
+
+            capture_start = time.time()
+            for frame_idx in range(num_frames):
+                print(f"  Capturing frame {frame_idx + 1}/{num_frames}")
+                rep.utils.send_og_event(event_name="randomize_red_cube")
                 await rep.orchestrator.step_async(rt_subframes=32)
-            return start_time
 
-        start_time = await run_example_async(num_frames)
-        await rep.orchestrator.wait_until_complete_async()
-        print(
-            f"The duration for capturing {num_frames} frames using '{'warp' if use_warp else 'numpy'}' was: {time.time() - start_time:.4f} seconds, with an average of {(time.time() - start_time) / num_frames:.4f} seconds per frame."
-        )
+            # Wait for the data to be written to disk and release resources
+            await rep.orchestrator.wait_until_complete_async()
+            writer.detach()
+            rp.destroy()
 
-    async def test_data_augmentation_no_warp_async(self):
-        out_subdir = "_out_augm_annot_warp_False"
-        await self.run_annotator_augmentation_async(
-            out_subdir=out_subdir, num_frames=self.NUM_FRAMES, use_warp=False, seed=self.SEED
-        )
+            return time.time() - capture_start
 
-        golden_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data", "golden", out_subdir)
-        test_dir = os.path.join(os.getcwd(), out_subdir)
-        print(f"Golden directory: {golden_dir}")
-        print(f"Test directory: {test_dir}")
+        def on_task_done(task: asyncio.Task) -> None:
+            """Report timing information when capture completes.
 
-        # Compare the rgb data (larger tolerance due to denoising differences)
-        self.compare_images_with_mean_diff(golden_dir, test_dir, "annot_rgb", self.RGB_MEAN_DIFF_TOLERANCE)
-        # Compare the depth data (smaller tolerance since it is not influenced by denoising)
-        self.compare_images_with_mean_diff(golden_dir, test_dir, "annot_depth_1", self.DEPTH_MEAN_DIFF_TOLERANCE)
-        self.compare_images_with_mean_diff(golden_dir, test_dir, "annot_depth_2", self.DEPTH_MEAN_DIFF_TOLERANCE)
+            Args:
+                task: Completed capture task whose result is the capture duration.
+            """
+            duration = task.result()
+            average = duration / NUM_FRAMES if NUM_FRAMES else 0.0
+            mode_label = "warp" if USE_WARP else "numpy"
+            print(
+                f"The duration for capturing {NUM_FRAMES} frames using '{mode_label}' was: {duration:.4f} seconds, "
+                f"with an average of {average:.4f} seconds per frame."
+            )
 
-    async def test_data_augmentation_with_warp_async(self):
-        out_subdir = "_out_augm_annot_warp_True"
-        await self.run_annotator_augmentation_async(
-            out_subdir=out_subdir, num_frames=self.NUM_FRAMES, use_warp=True, seed=self.SEED
-        )
+        # task = asyncio.ensure_future(run_example_async(NUM_FRAMES, RESOLUTION, USE_WARP))
+        # task.add_done_callback(on_task_done)
 
-        golden_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data", "golden", out_subdir)
-        test_dir = os.path.join(os.getcwd(), out_subdir)
-        print(f"Golden directory: {golden_dir}")
-        print(f"Test directory: {test_dir}")
+        test_num_frames = 2
+        for test_use_warp in [False, True]:
+            mode_label = "warp" if test_use_warp else "numpy"
+            golden_dir = os.path.join(
+                os.path.dirname(os.path.realpath(__file__)), "data", "golden", f"_out_augm_writer_{mode_label}"
+            )
+            await run_example_async(
+                num_frames=test_num_frames, resolution=RESOLUTION, use_warp=test_use_warp, env_url=""
+            )
+            out_dir = os.path.join(writer_test_root, mode_label)
 
-        # Compare the rgb data (larger tolerance due to denoising differences)
-        self.compare_images_with_mean_diff(golden_dir, test_dir, "annot_rgb", self.RGB_MEAN_DIFF_TOLERANCE)
-        # Compare the depth data (smaller tolerance since it is not influenced by denoising)
-        self.compare_images_with_mean_diff(golden_dir, test_dir, "annot_depth_1", self.DEPTH_MEAN_DIFF_TOLERANCE)
-        self.compare_images_with_mean_diff(golden_dir, test_dir, "annot_depth_2", self.DEPTH_MEAN_DIFF_TOLERANCE)
+            folder_contents_success = validate_folder_contents(
+                path=out_dir, expected_counts={"png": test_num_frames * 2, "npy": test_num_frames}
+            )
+            self.assertTrue(
+                folder_contents_success, f"Folder contents validation failed ({mode_label}). Output dir: {out_dir}"
+            )
 
-    async def test_data_augmentation_writer_no_warp_async(self):
-        out_subdir = "_out_augm_writer_warp_False"
-        await self.run_writer_augmentation_async(
-            out_subdir=out_subdir, num_frames=self.NUM_FRAMES, use_warp=False, seed=self.SEED
-        )
+            rgb_result = compare_images_in_directories(
+                golden_dir=golden_dir,
+                test_dir=out_dir,
+                path_pattern=r"^rgb_.*\.png$",
+                allclose_rtol=None,
+                allclose_atol=None,
+                mean_tolerance=self.NOISE_MEAN_DIFF_TOLERANCE,
+                print_all_stats=False,
+            )
+            self.assertTrue(
+                rgb_result["all_passed"],
+                f"RGB image comparison failed ({mode_label}, tol={self.NOISE_MEAN_DIFF_TOLERANCE}). Output dir: {out_dir}",
+            )
 
-        golden_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data", "golden", out_subdir)
-        test_dir = os.path.join(os.getcwd(), out_subdir)
-        print(f"Golden directory: {golden_dir}")
-        print(f"Test directory: {test_dir}")
-
-        # Compare the rgb data (larger tolerance due to denoising differences)
-        self.compare_images_with_mean_diff(golden_dir, test_dir, "rgb", self.RGB_MEAN_DIFF_TOLERANCE)
-        # Compare the depth data (smaller tolerance since it is not influenced by denoising)
-        self.compare_npy_files(
-            golden_dir, test_dir, "distance_to_image_plane", mean_diff_tolerance=self.DEPTH_MEAN_DIFF_TOLERANCE
-        )
-
-    async def test_data_augmentation_writer_with_warp_async(self):
-        out_subdir = "_out_augm_writer_warp_True"
-        await self.run_writer_augmentation_async(
-            out_subdir=out_subdir, num_frames=self.NUM_FRAMES, use_warp=True, seed=self.SEED
-        )
-
-        golden_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data", "golden", out_subdir)
-        test_dir = os.path.join(os.getcwd(), out_subdir)
-        print(f"Golden directory: {golden_dir}")
-        print(f"Test directory: {test_dir}")
-
-        # Compare the rgb data (larger tolerance due to denoising differences)
-        self.compare_images_with_mean_diff(golden_dir, test_dir, "rgb", self.RGB_MEAN_DIFF_TOLERANCE)
-        # Compare the depth data (smaller tolerance since it is not influenced by denoising)
-        self.compare_npy_files(
-            golden_dir, test_dir, "distance_to_image_plane", mean_diff_tolerance=self.DEPTH_MEAN_DIFF_TOLERANCE
-        )
+            depth_result = compare_images_in_directories(
+                golden_dir=golden_dir,
+                test_dir=out_dir,
+                path_pattern=r"^distance_to_camera_.*\.png$",
+                allclose_rtol=None,
+                allclose_atol=None,
+                mean_tolerance=self.NOISE_MEAN_DIFF_TOLERANCE,
+                print_all_stats=False,
+            )
+            self.assertTrue(
+                depth_result["all_passed"],
+                f"Depth image comparison failed ({mode_label}, tol={self.NOISE_MEAN_DIFF_TOLERANCE}). Output dir: {out_dir}",
+            )

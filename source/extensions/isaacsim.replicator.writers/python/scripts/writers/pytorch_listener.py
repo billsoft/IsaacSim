@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,35 +13,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+"""Provides a PyTorch-compatible listener for tracking and retrieving data from Replicator writers."""
 
-import torch
+from __future__ import annotations
 
 
 class PytorchListener:
-    """A Observer/Listener that keeps track of updated data sent by the writer. Is passed in the
-    initialization of a PytorchWriter at which point it is pinged by the writer after any data is
-    passed to the writer."""
+    """An Observer/Listener that keeps track of updated data sent by the writer. Is passed in the.
 
-    def __init__(self):
+    itialization of a PytorchWriter at which point it is pinged by the writer after any data is
+    passed to the writer.
+
+    .. deprecated:: 1.5.0
+
+        This class is deprecated and will be removed in a future version. No replacement is provided.
+    """
+
+    def __init__(self) -> None:
         self.data = {}
 
     def write_data(self, data: dict) -> None:
-        """Updates the existing data in the listener with the new data provided.
+        """Update the existing data in the listener with the new data provided.
 
         Args:
-            data (dict): new data retrieved from writer.
+            data: New data retrieved from writer.
         """
-
         self.data.update(data)
 
-    def get_rgb_data(self) -> Optional[torch.Tensor]:
-        """Returns RGB data as a batched tensor from the current data stored.
+    def get_rgb_data(self) -> "torch.Tensor | None":
+        """Return RGB data as a batched tensor from the current data stored.
 
         Returns:
-            images (Optional[torch.Tensor]): images in batched pytorch tensor form
+            Images in batched pytorch tensor form.
         """
-
         if "pytorch_rgb" in self.data:
             images = self.data["pytorch_rgb"]
             images = images[..., :3]

@@ -1,4 +1,48 @@
 # Changelog
+
+## [1.7.3] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings, and update `python_api.md`.
+
+## [1.7.2] - 2026-05-10
+### Fixed
+- Validate clone source prim paths before calling USD bindings.
+- Restore USD/Fabric change listeners when cloning exits with an exception.
+- Initialize cloner listener state before listener enable/disable calls.
+- Handle zero-clone grid requests and invalidate cached grid transforms when the clone count changes.
+
+## [1.7.1] - 2026-03-26
+### Changed
+- Moved Python binding module to `bindings/` subdirectory
+
+## [1.7.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [1.6.4] - 2026-02-28
+### Changed
+- Updated tests to use new omni.physics.core API (`IPhysicsSimulation.initialize`/`close` replaces removed `attach_stage`/`detach_stage`)
+
+## [1.6.3] - 2025-12-07
+### Changed
+- Fix clang tidy issues in cpp code
+
+## [1.6.2] - 2025-11-28
+### Changed
+- Add missing docstrings
+
+## [1.6.1] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [1.6.0] - 2025-10-27
+### Changed
+- Convert input arguments to NumPy without explicitly import PyTorch
+
+## [1.5.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [1.4.10] - 2025-08-29
 ### Changed
 - Renamed CARB profiling zones to include [IsaacSim] prefix

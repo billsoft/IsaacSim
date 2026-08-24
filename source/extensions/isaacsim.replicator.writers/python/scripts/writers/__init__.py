@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Collection of Isaac Sim Replicator writers for various data formats and visualization tasks."""
+
 from .data_visualization_writer import *
 from .dope_writer import *
 from .pose_writer import *
@@ -22,7 +24,13 @@ from .ycb_video_writer import *
 
 
 # Register writers and add them to the default writers for Replicator telemetry tracking
-def register_writers():
+def register_writers() -> None:
+    """Register all Isaac Sim Replicator writers with the WriterRegistry.
+
+    Registers DataVisualizationWriter, DOPEWriter, PoseWriter, PytorchWriter, and YCBVideoWriter
+    with the omni.replicator.core WriterRegistry and adds them to the default writers list for
+    Replicator telemetry tracking.
+    """
     from omni.replicator.core import WriterRegistry
 
     # DataVisualizationWriter

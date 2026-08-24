@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.2.1] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings.
+
+## [1.2.0] - 2026-05-19
+### Changed
+- Add internal token-based authentication to prevent code execution by unauthenticated sources
+
+## [1.1.6] - 2026-04-06
+### Changed
+- Disable SystemExit/BaseException tests in CI
+
+## [1.1.5] - 2026-04-02
+### Fixed
+- `SystemExit` and `BaseException` subclasses in user code are now caught and returned as errors instead of crashing the application
+- Replace mutable default arguments in `Executor.__init__` with `None` defaults
+- Fix `from __future__ import annotations` shadowing the `__future__` module
+
+## [1.1.4] - 2026-03-25
+### Changed
+- Replace deprecated onclick_fn with onclick_action for menu registration
+
+## [1.1.3] - 2026-03-02
+### Changed
+- Add Overview.md, add python_api.md, add SETTINGS.md and update docstrings
+
+## [1.1.2] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
 ## [1.1.1] - 2025-06-25
 ### Removed
 - Remove `chardet` from extension's Python dependencies

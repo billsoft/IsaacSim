@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Validate synthetic data generation benchmark results."""
+
 import argparse
+import os
+
+_VALIDATION_DIR = os.path.dirname(os.path.realpath(__file__))
+_DEFAULT_GOLDEN_DIR = os.path.join(_VALIDATION_DIR, "golden_data")
+_DEFAULT_CAPTURES_DIR = os.path.join(_VALIDATION_DIR, "captures")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--num-frames", type=int, default=600, help="Number of frames to capture")
@@ -36,13 +43,13 @@ parser.add_argument("--gpu-frametime", action="store_true", help="Enable GPU fra
 
 parser.add_argument(
     "--golden-dir",
-    default="standalone_examples/benchmarks/validation/golden_data",
-    help="Directory holding golden images - relative to the current working directory",
+    default=_DEFAULT_GOLDEN_DIR,
+    help="Directory holding golden images (default: validation/golden_data next to this script)",
 )
 parser.add_argument(
     "--output-dir",
-    default="standalone_examples/benchmarks/validation/captures",
-    help="Directory holding output images from current run - relative to the current working directory",
+    default=_DEFAULT_CAPTURES_DIR,
+    help="Directory for captured images (default: validation/captures next to this script)",
 )
 parser.add_argument("--tolerance", type=int, default=5, help="Tolerance for mean difference in image comparison")
 parser.add_argument(
@@ -94,10 +101,12 @@ from isaacsim.storage.native import get_assets_root_path
 
 enable_extension("isaacsim.benchmark.services")
 
-from isaacsim.benchmark.services import BaseIsaacBenchmark
+from isaacsim.benchmark.services import DEFAULT_RECORDERS, BaseIsaacBenchmark
 from isaacsim.benchmark.services.validation import Validator
 
 # Create the benchmark
+# Define recorders to use, use default set, other combinations, or custom data recorders
+recorders = DEFAULT_RECORDERS + ["gpu_frametime"] if gpu_frametime else DEFAULT_RECORDERS
 benchmark = BaseIsaacBenchmark(
     benchmark_name="benchmark_sdg",
     workflow_metadata={
@@ -112,7 +121,7 @@ benchmark = BaseIsaacBenchmark(
         ]
     },
     backend_type=args.backend_type,
-    gpu_frametime=gpu_frametime,
+    recorders=recorders,
 )
 
 benchmark.set_phase("loading", start_recording_frametime=False, start_recording_runtime=True)

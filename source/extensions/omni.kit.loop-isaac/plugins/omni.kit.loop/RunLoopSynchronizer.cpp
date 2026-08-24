@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2020-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +12,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 #include "RunLoopSynchronizer.h"
 
 #include <carb/dictionary/IDictionary.h>
@@ -56,6 +57,14 @@ static float myceil(float x, float tolerance = 0.05f)
     return intpart;
 }
 
+/**
+ * @brief Rounds a float down with tolerance adjustment
+ * @details Similar to floor but with a tolerance threshold. If the fractional
+ *          part is greater than (1 - tolerance), the value is rounded up instead.
+ * @param[in] x The input value to round
+ * @param[in] tolerance The tolerance threshold (default 0.05)
+ * @return The rounded integer value as a float
+ */
 static float myfloor(float x, float tolerance = 0.05f)
 {
     float intpart;
@@ -71,10 +80,13 @@ static float myfloor(float x, float tolerance = 0.05f)
 }
 
 /**
- * @brief Takes two float values A and B as input, and returns the closest
- * fraction to B that is a multiple of A.
- *
- * It works with 2x, 3x, 4x as well as with x/2, x/3, x/4
+ * @brief Finds the closest fraction to B that is a multiple of A
+ * @details Takes two float values A and B as input, and returns the closest
+ *          fraction to B that is a multiple of A. Works with 2x, 3x, 4x
+ *          as well as with x/2, x/3, x/4.
+ * @param[in] A The base value to find multiples of
+ * @param[in] B The target value to approximate
+ * @return The closest fraction to B that is a multiple of A
  */
 static float findClosestFraction(float A, float B)
 {

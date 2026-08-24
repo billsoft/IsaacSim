@@ -1,4 +1,111 @@
 # Changelog
+
+## [5.2.12] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings, and update `python_api.md`.
+
+## [5.2.11] - 2026-05-28
+### Fixed
+- Conditional use of asset until menagerie assets are tested with Isaac lab
+
+## [5.2.10] - 2026-05-21
+### Fixed
+- Restore the prior physics sim device and fabric state in the cleanup paths of the interactive Quadruped, Go2, and Humanoid examples so the PhysX direct-GPU API flag is not left enabled, which previously caused `PxArticulationJointReducedCoordinate::setDriveTarget` errors when modifying USD in subsequent sessions
+
+### Added
+- Unit tests covering the snapshot/restore helpers in `isaacsim.robot.policy.examples.interactive.utils`, plus per-example roundtrip tests that verify the Quadruped, Go2, and Humanoid examples leave the physics sim device and fabric flag unchanged after cleanup
+
+### Changed
+- Extract the snapshot/restore physics-state logic shared by the interactive Quadruped, Go2, and Humanoid examples into `isaacsim.robot.policy.examples.interactive.utils`
+
+## [5.2.9] - 2026-05-21
+### Fixed
+- Spot fall over issue in example by reverting the physics dt to 500hz
+
+## [5.2.8] - 2026-05-20
+### Fixed
+- Select the asset's `Physics` variant before constructing the `Articulation` in `PolicyController.__init__`, so `UsdPhysics.ArticulationRootAPI` is authored on a descendant prim before `Articulation.fetch_articulation_root_api_prim_paths` resolves the root (prevents `Path.IsValidPathString(NoneType)` crashes)
+- Apply `PhysxArticulationAPI` to the articulation root prim in `PolicyController._set_articulation_props` if it is missing, avoiding `Empty typeName` USD errors when the asset's Physics variant does not author the API
+- Update default USD paths for Go2 and Spot policy controllers to the nested `Mujoco_Menagerie/<robot>/<robot>/<robot>.usda` layout
+
+## [5.2.7] - 2026-05-20
+### Fixed
+- Missing _timeline error on policy reset
+
+## [5.2.6] - 2026-05-05
+### Added
+- Standing test for the Go2 policy that holds a zero command and asserts the robot remains upright
+
+### Fixed
+- Select the USD `Physics` variant from `SimulationManager.get_active_physics_engine()` so the Newton-compatible variant is chosen when Newton is the active engine
+- Log a warning when the requested USD `Physics` variant is not declared on the robot prim instead of silently selecting a non-existent variant
+- Remove the `_set_physics_variant` override in `SpotFlatTerrainPolicy` so it inherits the engine-to-variant mapping from `PolicyController`
+
+## [5.2.5] - 2026-04-23
+### Changed
+- Decreased test tolerance to pass with newton backend.
+
+## [5.2.4] - 2026-04-23
+### Fixed
+- Added isaacsim.physics.newton.tensors as extension dep
+
+## [5.2.3] - 2026-04-23
+### Changed
+- Defer torch import to avoid loading it at startup
+
+## [5.2.2] - 2026-04-08
+### Fixed
+- Fix physics variant selection to match USD variant names case-insensitively, resolving H1 robot loading failure when variant set uses `Physx` instead of `physx`
+- Register `isaacsim.robot.policy.examples.robots` as a public module in the extension manifest
+
+## [5.2.1] - 2026-04-06
+### Changed
+- Set `reset_xform_op_properties` to True when instantiating the Articulation
+
+## [5.2.0] - 2026-03-17
+### Added
+- Newton can be used as a physics backend
+
+## [5.1.1] - 2026-03-04
+### Changed
+- Fix api errors
+
+## [5.1.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [5.0.4] - 2026-02-04
+### Changed
+- Update physics rate for drawer opening test for CPU test
+
+## [5.0.3] - 2025-12-08
+### Changed
+- Removed rendering manager test time dependency (moved to base sample)
+
+## [5.0.2] - 2025-12-03
+### Changed
+- Remove TODOs.
+
+## [5.0.1] - 2025-12-02
+### Changed
+- Removed unecessary dependencies
+- Removed remaining experimental api references
+
+## [5.0.0] - 2025-12-01
+### Changed
+- Changed the backend to experimental API using warp and torch
+- Enabled GPU physics to inference policies
+- Moved policy based interactive examples to the isaacsim.robot.policy.examples folder
+
+## [4.3.0] - 2025-10-27
+### Changed
+- Replace import statements with the deprecation function when importing PyTorch
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [4.2.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [4.1.11] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 4.1.10)
@@ -84,7 +191,7 @@
 ## [4.0.0] - 2024-11-01
 ### Removed
 - Unitree quadruped optimized controller class
-- optimized controller based standalone and ROS examples
+- Optimized controller based standalone and ROS examples
 
 ### Added
 - Policy Controller and config loader helpers for Isaac Lab based env config
@@ -176,12 +283,12 @@
 
 ## [1.1.0] - 2022-05-05
 ### Added
-- added the ANYmal robot
+- Added the ANYmal robot
 
 ## [1.0.2] - 2022-04-21
 ### Changed
-- decoupled sensor testing from A1 and Go1 unit test
-- fixed contact sensor bug in example and standalone
+- Decoupled sensor testing from A1 and Go1 unit test
+- Fixed contact sensor bug in example and standalone
 
 ## [1.0.1] - 2022-04-20
 ### Changed
@@ -189,7 +296,7 @@
 
 ## [1.0.0] - 2022-04-13
 ### Added
-- quadruped class, unitree class (support both a1, go1), unitree vision class (unitree class with stereo cameras), and unitree direct class (unitree class that subscribe to external controllers)
-- quadruped controllers
-- documentations and unit tests
-- quadruped standalone with ros 1 and ros 2 vio examples
+- Quadruped class, unitree class (support both a1, go1), unitree vision class (unitree class with stereo cameras), and unitree direct class (unitree class that subscribe to external controllers)
+- Quadruped controllers
+- Documentations and unit tests
+- Quadruped standalone with ros 1 and ros 2 vio examples

@@ -1,5 +1,155 @@
 # Changelog
 
+## [5.10.5] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings, and update `python_api.md`.
+
+## [5.10.4] - 2026-05-29
+### Fixed
+- `OgnIsaacComputeTransformTree`: refine the `IsaacRobotAPI` fallback via `isaacsim.robot.schema`'s `GetAllRobotComponents` helper — emits frames for every schema-tagged prim in the robot subtree (links, sites, reference points), skips a component path that matches `parentPrim` to avoid the `TF_SELF_TRANSFORM` self-loop, and applies the ROS optical-frame rotation to camera-sites.
+
+## [5.10.3] - 2026-05-27
+### Fixed
+- `OgnIsaacComputeTransformTree`: when the supplied target prim carries `IsaacRobotAPI` but not `UsdPhysicsArticulationRootAPI`, resolve the link list via `isaac:physics:robotLinks` and emit one frame per link instead of a single frame for the root prim. Handles assets where the articulation root sits on a deeper `base_link` (e.g. exported turtlebot scenes).
+- `OgnIsaacComputeOdometry`: when `chassisPrim` carries `IsaacRobotAPI` but not `UsdPhysicsRigidBodyAPI` / `UsdPhysicsArticulationRootAPI`, walk `isaac:physics:robotLinks` to find a link with the appropriate physics API before forwarding the path to `omni.physx.tensors`. Previously the tensors plugin emitted a `Pattern '<path>' did not match any rigid bodies` warning before the node's own `logError`.
+- `OgnIsaacComputeTransformTree`: reconstruct kinematic parent-child topology from `isaac:physics:robotJoints` when expanding `IsaacRobotAPI` targets, so the emitted TF tree mirrors the joint graph instead of parenting every link to world.
+- `OgnIsaacJointNameResolver`: when the supplied `targetPrim` / `robotPath` lacks `UsdPhysicsArticulationRootAPI`, descend the prim hierarchy looking for the first descendant that has it (handles `IsaacRobotAPI`-only root prims and ancestor `Xform` targets).
+- `OgnIsaacJointNameResolver`: pass `state.m_robotPath.c_str()` to `db.logError("...%s", ...)` instead of the `std::string` itself, so error messages print the actual prim path rather than garbled memory.
+
+## [5.10.2] - 2026-05-21
+### Fixed
+- `OgnIsaacComputeOdometry`: bind `chassisPrim` to a rigid body view whenever the prim has `UsdPhysicsRigidBodyAPI`, even if it also has `UsdPhysicsArticulationRootAPI`. Previously the node read `IArticulationDataView::getRootTransforms()`, which returns the pose of the link PhysX auto-selects as the articulation root by minimum graph eccentricity. Attaching extra bodies (for example via Robot Assembler) extended the articulation graph and shifted the auto-selected root onto a non-chassis link, producing incorrect odometry position/velocity.
+
+## [5.10.1] - 2026-05-12
+### Fixed
+- `IsaacArticulationController`: promote silent `db.log_warn` failures to `db.log_error` for both the catch-all exception path and the command-validation path so OmniGraph users see actionable errors instead of a stationary robot with no diagnostic. Errors now include the prim path and the original exception text. (6109472, 6113767)
+- `IsaacArticulationController`: validate `positionCommand`, `velocityCommand`, and `effortCommand` atomically before any target is written, so a single bad command no longer leaves the articulation in a half-applied state. Mismatch errors now name the offending command, the provided value count, the selected joint count, and the selected joint indices. (6114423)
+
+## [5.10.0] - 2026-05-06
+### Changed
+- `OgnIsaacComputeTransformTree`: optimized world-pose computation by reading physics poses from the active backend and composing non-physics prims from cached USD local transforms.
+- `OgnIsaacComputeTransformTree`: improved non-physics, camera, and `parentPrim` handling, including `isaac:nameOverride`, `resetXformStack`, physics-ancestor discovery, and RTX lidar camera-frame behavior.
+- `OgnIsaacComputeTransformTree`: expanded Python test coverage for physics-backed and USD-backed transform-tree paths.
+
+## [5.9.1] - 2026-05-05
+### Changed
+- Switch to app_uitls.update_app_async(...) instead of omni.syntheticdata.sensors.next_render_simulation_async(...) in unit tests for multitick compatibility
+
+## [5.9.0] - 2026-05-05
+### Fixed
+- Make `IsaacArticulationController` reject command arrays whose length does not match an explicit joint selection.
+- Make `IsaacArticulationController` skip `NaN` command entries instead of reading previous targets from local tensor state.
+
+## [5.8.1] - 2026-05-04
+### Fixed
+- `OgnIsaacComputeTransformTree`: skip invalid/non-existent target prim definitions instead of crashing in the xform view layer
+
+## [5.8.0] - 2026-04-30
+### Changed
+- `OgnOnPhysicsStep` uses the generic `IPhysicsSimulation` API instead of the PhysX-specific `IPhysx` API for physics step event subscriptions, enabling OmniGraph execution with any physics backend
+
+## [5.7.5] - 2026-04-24
+### Changed
+- `OgnIsaacComputeOdometry` and `OgnIsaacComputeTransformTree` use `getActivePhysicsEngineName()` to select the simulation backend dynamically instead of hardcoding `"physx"`
+
+## [5.7.4] - 2026-04-21
+### Changed
+- `OgnIsaacComputeTransformTree`: deferred frame name resolution to compute time so `isaac:nameOverride` attributes are fully authored before lookup
+- `OgnIsaacComputeTransformTree`: leaf prims take priority over mount parents sharing the same `nameOverride`; collisions fall back to ancestor-prefixed names (e.g. `robot_name_frame`) instead of replacing the full USD path with underscores
+- `OgnIsaacComputeTransformTree`: output arrays are only resized when the pair count changes, avoiding per-frame allocations
+- `OgnIsaacJointNameResolver`: skip prims without `isaac:nameOverride` during name override map construction, avoiding unnecessary attribute lookups
+- `OgnIsaacJointNameResolver`: name override map stores `std::string` prim names instead of live `pxr::UsdPrim` handles
+
+## [5.7.3] - 2026-04-20
+### Changed
+- `OgnIsaacComputeOdometry`: call `update()` on the articulation/rigid-body view at the start of each physics tick to flush pending data from the PhysX backend before reading transforms and velocities
+- `OgnIsaacComputeTransformTree`: add `<cstdint>` include; simplify compute path to return false immediately when `ensureCurrentView` fails instead of attempting a re-initialization
+
+## [5.7.2] - 2026-04-15
+### Changed
+- Modified the `OgnIsaacComputeOdometry` and `OgnIsaacComputeTransformTree` nodes to validate that their current prim views are correct before executing.
+
+## [5.7.1] - 2026-03-25
+### Fixed
+- IsaacComputeTransformTree now applies a 180-degree x-axis rotation for UsdGeomCamera prims to convert from USD camera convention to ROS optical frame convention
+
+### Changed
+- IsaacComputeTransformTree uses quaternion math instead of GfMatrix4d for relative transform computation, improving performance
+- IsaacComputeTransformTree caches parent world poses to avoid redundant lookups
+
+## [5.7.0] - 2026-03-21
+### Changed
+- IsaacCreateRenderProduct node now supports re-using existing render products via `renderProductPrim` input
+- IsaacCreateRenderProduct node now supports SRTX render product creation
+
+## [5.6.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [5.5.0] - 2026-03-04
+### Added
+- IsaacComputeTransformTree node that computes parent/child frame names, translations, and orientations for a prim hierarchy using IXformDataView (no physics tensors required)
+
+### Changed
+- Remove unused carb/Defines.h and carb/Types.h includes from OgnIsaacComputeOdometry
+
+## [5.4.0] - 2026-02-27
+### Changed
+- Migrate Odometry and joint name resolved nodes to use core experimental prims APIs
+
+## [5.3.0] - 2026-01-27
+### Added
+- IsaacAttachHydraTexture node allows user to add HydraTextures and RenderVars on demand to RenderProduct prims already in the stage
+
+## [5.2.0] - 2025-12-15
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [5.1.3] - 2025-12-06
+### Changed
+- Migrate OgnOnPhysicsStep to Events 2.0.
+- Update description
+
+## [5.1.2] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [5.1.1] - 2025-12-03
+### Changed
+- Remove TODOs.
+
+## [5.1.0] - 2025-11-25
+### Changed
+- Set ResetOnStop to True for all Simulation Time OG nodes
+
+## [5.0.0] - 2025-11-24
+### Changed
+- Moved handle interface to isaacsim.ros2.nodes extension where it was used.
+
+## [4.0.4] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [4.0.3] - 2025-10-31
+### Changed
+- Update deprecated python unittest methods
+
+## [4.0.2] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [4.0.1] - 2025-10-22
+### Changed
+- Remove deprecated dependencies
+
+## [4.0.0] - 2025-10-20
+### Changed
+- Remove deprecated time related APIs from CoreNodes interface
+
+## [3.4.4] - 2025-10-18
+### Changed
+- Remove extra carb settings from tests
+
 ## [3.4.3] - 2025-10-02
 ### Fixed
 - Fixed Isaac Read World Pose node bug for extracting translation and orientation on Spark
@@ -125,8 +275,8 @@
 - Modified input arguments for python bindings to take a tuple instead of a rational time object which could not be created by the user
 
 ### Removed
-- deprecated function and their python bindings getSimTimeAtSwhFrame, getSimTimeMonotonicAtSwhFrame, getSystemTimeAtSwhFrame, get_sim_time_at_swh_frame, get_sim_time_monotonic_at_swh_frame, get_system_time_at_swh_frame
-- removed IsaacReadTimes node
+- Deprecated function and their python bindings getSimTimeAtSwhFrame, getSimTimeMonotonicAtSwhFrame, getSystemTimeAtSwhFrame, get_sim_time_at_swh_frame, get_sim_time_monotonic_at_swh_frame, get_system_time_at_swh_frame
+- Removed IsaacReadTimes node
 
 ## [2.2.17] - 2025-05-09
 ### Added
@@ -146,7 +296,7 @@
 
 ## [2.2.13] - 2025-04-29
 ### Fixed
-- prim validation in OgnIsaacComputeOdometry node
+- Prim validation in OgnIsaacComputeOdometry node
 
 ## [2.2.12] - 2025-04-15
 ### Changed
@@ -186,7 +336,7 @@
 
 ## [2.2.4] - 2025-03-09
 ### Fixed
-- fix failing unit tests
+- Fix failing unit tests
 
 ## [2.2.3] - 2025-03-05
 ### Changed
@@ -404,7 +554,7 @@
 
 ## [1.4.3] - 2023-08-25
 ### Changed
-- added stdout fail pattern for the expected no prim found edge case for the ogn test
+- Added stdout fail pattern for the expected no prim found edge case for the ogn test
 
 ## [1.4.2] - 2023-08-24
 ### Fixed
@@ -438,7 +588,7 @@
 
 ## [1.1.0] - 2023-07-06
 ### Removed
-- unused writer and node template attachment systems
+- Unused writer and node template attachment systems
 
 ## [1.0.0] - 2023-06-13
 ### Added
@@ -456,9 +606,9 @@
 - getSimulationTimeMonotonicAtSwhFrame now getSimulationTimeMonotonicAtTime with rational time
 - getSystemTimeAtSwhFrame now getSystemTimeAtTime with rational time
 - [SENSOR NAME]IsaacSimulationGate nodes to [RENDERVAR]IsaacSimulationGate to match synthetic data standard
-- deprecated get_sim_time_at_swh_frame
-- deprecated get_sim_time_monotonic_at_swh_frame
-- deprecated get_system_time_at_swh_frame
+- Deprecated get_sim_time_at_swh_frame
+- Deprecated get_sim_time_monotonic_at_swh_frame
+- Deprecated get_system_time_at_swh_frame
 
 ### Removed
 - IsaacReadSystemTime node
@@ -489,26 +639,26 @@
 
 ## [0.22.1] - 2023-01-25
 ### Fixed
-- remove un-needed cpp ogn files from extension
+- Remove un-needed cpp ogn files from extension
 
 ## [0.22.0] - 2023-01-09
 ### Added
-- interface for caching and retreiving handles
+- Interface for caching and retreiving handles
 
 ## [0.21.0] - 2022-12-10
 ### Changed
 - IsaacSimulationGate step value can now be set to zero to stop execution
 
 ### Added
-- function to handle writer activation requests to avoid race conditions from camera helpers.
+- Function to handle writer activation requests to avoid race conditions from camera helpers.
 
 ## [0.20.0] - 2022-12-05
 ### Added
 - IsaacSetCameraOnRenderProduct Node
-- render product support for ReadCameraInfo
-- fisheye parameter support for ReadCameraInfo
-- utility function to cache writer attach calls until the next frame
-- ogn tests for IsaacCreateRenderProduct, IsaacReadCameraInfo
+- Render product support for ReadCameraInfo
+- Fisheye parameter support for ReadCameraInfo
+- Utility function to cache writer attach calls until the next frame
+- Ogn tests for IsaacCreateRenderProduct, IsaacReadCameraInfo
 
 ### Changed
 - Deprecate viewport support in ReadCameraInfo
@@ -544,11 +694,11 @@
 
 ## [0.15.0] - 2022-09-28
 ### Added
-- python bindings and tests for timing related APIs
+- Python bindings and tests for timing related APIs
 
 ## [0.14.3] - 2022-09-12
 ### Added
-- unit test for create viewport node
+- Unit test for create viewport node
 
 ### Fixed
 - CreateViewport node uses legacy viewport ID which used to be the viewport index, the index is now converted to ID
@@ -559,7 +709,7 @@
 
 ## [0.14.1] - 2022-09-02
 ### Fixed
-- bug with hiding /Render prim when it didn't exist
+- Bug with hiding /Render prim when it didn't exist
 
 ## [0.14.0] - 2022-08-31
 ### Changed
@@ -567,7 +717,7 @@
 
 ## [0.13.0] - 2022-08-09
 ### Added
-- utility function to cache node activations until the next frame. This solves an issue where activating node templates from other nodes would cause a race condition
+- Utility function to cache node activations until the next frame. This solves an issue where activating node templates from other nodes would cause a race condition
 
 ### Fixed
 - IsaacSetViewportResolution node forces window aperture to reset if the resolution is changed.
@@ -688,14 +838,14 @@
 - Cleanup UI node names
 
 ### Fixed
-- fixed issue with swh frame not working when simulation was stopped.
+- Fixed issue with swh frame not working when simulation was stopped.
 
 ## [0.3.0] - 2022-04-25
 ### Changed
-- renamed OgnIsaacRGBAToRGB to OgnIsaacConvertRGBAToRGB
-- renamed OgnIsaacTestGenerateRGBA to OgnIsaacGenerateRGBA
-- using a global clock for simulation time
-- added ability to get simulation time from swhFrameNumber
+- Renamed OgnIsaacRGBAToRGB to OgnIsaacConvertRGBAToRGB
+- Renamed OgnIsaacTestGenerateRGBA to OgnIsaacGenerateRGBA
+- Using a global clock for simulation time
+- Added ability to get simulation time from swhFrameNumber
 
 ## [0.2.1] - 2022-04-22
 ### Changed

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -62,9 +62,9 @@ public:
      */
     struct TimeData
     {
-        double simTime;
-        double simTimeMonotonic;
-        double systemTime;
+        double simTime; ///< Simulation time in seconds (may reset on timeline stop).
+        double simTimeMonotonic; ///< Monotonically increasing simulation time in seconds.
+        double systemTime; ///< Wall-clock system time in seconds.
     };
 
     /**
@@ -72,9 +72,9 @@ public:
      */
     struct Entry
     {
-        omni::fabric::RationalTime time;
-        TimeData data;
-        bool valid = false;
+        omni::fabric::RationalTime time; ///< Rational time code for this sample.
+        TimeData data; ///< Time data associated with this sample.
+        bool valid = false; ///< Whether this entry contains valid data.
     };
     /**
      * @brief Constructor
@@ -156,7 +156,7 @@ public:
      */
     static constexpr size_t getBufferCapacity()
     {
-        return kBufferCapacity;
+        return s_kBufferCapacity;
     }
 
     /**
@@ -198,17 +198,17 @@ private:
      * Set to 31 samples to balance memory usage with interpolation reliability.
      * At 60Hz simulation rate, this retains approximately 0.5 seconds of history.
      */
-    static constexpr size_t kBufferCapacity = 31;
+    static constexpr size_t s_kBufferCapacity = 31;
 
     /** @brief Denominator for converting double time to rational time (microsecond precision) */
-    static constexpr uint64_t kMicrosecondPrecisionDenominator = 1000000;
+    static constexpr uint64_t s_kMicrosecondPrecisionDenominator = 1000000;
 
     // Circular buffer members
     /** @brief Thread synchronization for buffer access */
     mutable std::shared_mutex m_mutex;
 
     /** @brief Fixed-size buffer for storing time entries */
-    std::array<Entry, kBufferCapacity> m_buffer;
+    std::array<Entry, s_kBufferCapacity> m_buffer;
 
     /** @brief Next write position in the circular buffer */
     size_t m_head = 0;

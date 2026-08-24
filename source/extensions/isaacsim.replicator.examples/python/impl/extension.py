@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,12 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Entry point extension for Isaac Sim Replicator examples, providing reference implementations of synthetic data generation capabilities for robotics simulation and machine learning workflows."""
+
 import omni.ext
 
 
 class Extension(omni.ext.IExt):
-    def on_startup(self, ext_id):
-        pass
+    """Entry point for the isaacsim.replicator.examples extension.
 
-    def on_shutdown(self):
-        pass
+    This extension provides example implementations and demonstrations of Replicator functionality
+    within Isaac Sim. It serves as a reference for users learning how to use Replicator's
+    synthetic data generation capabilities for robotics simulation and machine learning workflows.
+    """
+
+    def on_startup(self, ext_id: str) -> None:
+        """Called when the extension is starting up.
+
+        Args:
+            ext_id: The extension identifier.
+        """
+
+    def on_shutdown(self) -> None:
+        """Called when the extension is shutting down."""

@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.2.2] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings, and update `python_api.md`.
+
+## [1.2.1] - 2026-05-05
+### Removed
+- Remove the check for deprecated lidar schema on USD Camera prims
+
+## [1.2.0] - 2026-04-28
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [1.1.2] - 2026-04-08
+### Fixed
+- Fix mypy type errors: add type annotations, fix callback types, add None guards, rename variable shadowing builtin
+
+## [1.1.1] - 2026-03-06
+### Fixed
+- Clear per-frame camera state subscriber when window is hidden to stop GLOBAL_EVENT_UPDATE callbacks while the panel is not visible
+
+## [1.1.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [1.0.18] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
+## [1.0.17] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [1.0.16] - 2025-08-27
 ### Fixed
 - Fix the broken documentation links

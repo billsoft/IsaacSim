@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Verifies PhysicsMaterial instance discovery from USD physics material prims. Covers fetching physics material wrappers from authored stage prims."""
+
 import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.kit.test
 from isaacsim.core.experimental.materials import (
@@ -24,17 +26,20 @@ from isaacsim.core.experimental.materials import (
 
 
 class TestVisualMaterial(omni.kit.test.AsyncTestCase):
-    async def setUp(self):
-        """Method called to prepare the test fixture"""
+    """Test visual material."""
+
+    async def setUp(self) -> None:
+        """Method called to prepare the test fixture."""
         super().setUp()
 
-    async def tearDown(self):
-        """Method called immediately after the test method has been called"""
+    async def tearDown(self) -> None:
+        """Method called immediately after the test method has been called."""
         super().tearDown()
 
     # --------------------------------------------------------------------
 
-    async def test_fetch_instances(self):
+    async def test_fetch_instances(self) -> None:
+        """Test fetch instances."""
         await stage_utils.create_new_stage_async()
         # create materials
         RigidBodyMaterial("/World/material_01")

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Literal
+"""Validate Cylinder wrapping and cylinder-specific USD attributes.
+
+The suite authors existing cylinder prims for wrap-mode tests, verifies USD
+geom binding and collection length, and round-trips radius, height, and axis
+tokens through indexed get/set calls.
+"""
+
+from typing import Any, Literal
 
 import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.kit.test
@@ -32,7 +39,14 @@ from isaacsim.core.experimental.prims.tests.common import (
 from pxr import UsdGeom
 
 
-async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"], **kwargs) -> None:
+async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"], **kwargs: Any) -> None:
+    """Create a fresh stage and author existing cylinder prims for wrap-mode tests.
+
+    Args:
+        max_num_prims: Maximum number of prims to prepare on the stage.
+        operation: Operation mode selected by parametrization.
+        **kwargs: Additional arguments supplied by parametrization.
+    """
     # create new stage
     await stage_utils.create_new_stage_async()
     # define prims
@@ -42,27 +56,53 @@ async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"
 
 
 class TestCylinder(omni.kit.test.AsyncTestCase):
-    async def setUp(self):
-        """Method called to prepare the test fixture"""
+    """Exercise Cylinder geometry checks and authored shape attributes."""
+
+    async def setUp(self) -> None:
+        """Initialize the async fixture; parametrized cases create their own stages."""
         super().setUp()
 
-    async def tearDown(self):
-        """Method called immediately after the test method has been called"""
+    async def tearDown(self) -> None:
+        """Finalize the async fixture without additional shape cleanup."""
         super().tearDown()
 
     # --------------------------------------------------------------------
 
     @parametrize(backends=["usd"], prim_class=TargetShape, populate_stage_func=populate_stage)
-    async def test_len(self, prim, num_prims, device, backend):
+    async def test_len(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test len.
+
+        Args:
+            prim: Object wrapper collection under test.
+            num_prims: Number of prims in the parametrized collection.
+            device: Device expected for returned arrays.
+            backend: Backend name selected by parametrization.
+        """
         self.assertEqual(len(prim), num_prims, f"Invalid len ({num_prims} prims)")
 
     @parametrize(backends=["usd"], prim_class=TargetShape, populate_stage_func=populate_stage)
-    async def test_geoms(self, prim, num_prims, device, backend):
+    async def test_geoms(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test geoms.
+
+        Args:
+            prim: Object wrapper collection under test.
+            num_prims: Number of prims in the parametrized collection.
+            device: Device expected for returned arrays.
+            backend: Backend name selected by parametrization.
+        """
         for usd_prim, geom in zip(prim.prims, prim.geoms):
             self.assertTrue(usd_prim.IsA(UsdGeom.Cylinder), f"Invalid geom type: {usd_prim.GetTypeName()}")
 
     @parametrize(backends=["usd"], prim_class=TargetShape, populate_stage_func=populate_stage)
-    async def test_radii(self, prim, num_prims, device, backend):
+    async def test_radii(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test radii.
+
+        Args:
+            prim: Object wrapper collection under test.
+            num_prims: Number of prims in the parametrized collection.
+            device: Device expected for returned arrays.
+            backend: Backend name selected by parametrization.
+        """
         for indices, expected_count in draw_indices(count=num_prims, step=2):
             cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_sample(shape=(expected_count, 1), dtype=wp.float32):
@@ -72,7 +112,15 @@ class TestCylinder(omni.kit.test.AsyncTestCase):
                 check_allclose(expected_v0, output, given=(v0,))
 
     @parametrize(backends=["usd"], prim_class=TargetShape, populate_stage_func=populate_stage)
-    async def test_heights(self, prim, num_prims, device, backend):
+    async def test_heights(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test heights.
+
+        Args:
+            prim: Object wrapper collection under test.
+            num_prims: Number of prims in the parametrized collection.
+            device: Device expected for returned arrays.
+            backend: Backend name selected by parametrization.
+        """
         for indices, expected_count in draw_indices(count=num_prims, step=2):
             cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_sample(shape=(expected_count, 1), dtype=wp.float32):
@@ -82,7 +130,15 @@ class TestCylinder(omni.kit.test.AsyncTestCase):
                 check_allclose(expected_v0, output, given=(v0,))
 
     @parametrize(backends=["usd"], prim_class=TargetShape, populate_stage_func=populate_stage)
-    async def test_axes(self, prim, num_prims, device, backend):
+    async def test_axes(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test axes.
+
+        Args:
+            prim: Object wrapper collection under test.
+            num_prims: Number of prims in the parametrized collection.
+            device: Device expected for returned arrays.
+            backend: Backend name selected by parametrization.
+        """
         choices = ["X", "Y", "Z"]
         for indices, expected_count in draw_indices(count=num_prims, step=2):
             cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")

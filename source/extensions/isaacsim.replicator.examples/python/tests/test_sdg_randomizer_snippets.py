@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,257 +13,44 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import omni.kit.test
+"""Verify Replicator randomizer snippets for sphere scanning and physics-based pallet filling."""
 
-################################################################################
-### !!!IMPORTANT!!!
-### The tests below are replicator alternative randomizer snippets from the docs.
-### If you fix an issue here make sure to update the code in the docs as well
-### The idea is that we can catch any api changes and update the docs appropriately
-################################################################################
+import tempfile
+from typing import Any
+
+import omni.kit
+import omni.usd
+from isaacsim.test.utils.file_validation import validate_folder_contents
 
 
 class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
-    async def setUp(self):
+    """Runs camera, asset, texture, and physics randomization snippets and validates captures."""
+
+    async def setUp(self) -> None:
+        """Create a fresh stage before running randomizer snippets."""
         await omni.usd.get_context().new_stage_async()
         await omni.kit.app.get_app().next_update_async()
 
-    async def tearDown(self):
+    async def tearDown(self) -> Any:
+        """Let pending updates and asset loads settle before the next snippet test.
+
+        Returns:
+            None.
+        """
         for _ in range(10):
             await omni.kit.app.get_app().next_update_async()
         # In some cases the test will end before the asset is loaded, in this case wait for assets to load
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             await omni.kit.app.get_app().next_update_async()
 
-    async def test_randomizing_a_light_source(self):
-        import asyncio
-        import os
+    async def test_randomize_sequential_sphere_scan(self) -> Any:
+        """Move a camera along Fibonacci-sphere viewpoints while randomizing pallet/bin poses.
 
-        import numpy as np
-        import omni.kit.commands
-        import omni.replicator.core as rep
-        import omni.usd
-        from isaacsim.core.utils.semantics import add_labels
-        from pxr import Gf, Sdf, UsdGeom
-
-        omni.usd.get_context().new_stage()
-        stage = omni.usd.get_context().get_stage()
-
-        sphere = stage.DefinePrim("/World/Sphere", "Sphere")
-        UsdGeom.Xformable(sphere).AddTranslateOp().Set((0.0, 1.0, 1.0))
-        add_labels(sphere, labels=["sphere"], instance_name="class")
-
-        cube = stage.DefinePrim("/World/Cube", "Cube")
-        UsdGeom.Xformable(cube).AddTranslateOp().Set((0.0, -2.0, 2.0))
-        add_labels(cube, labels=["cube"], instance_name="class")
-
-        plane_path = "/World/Plane"
-        omni.kit.commands.execute("CreateMeshPrimWithDefaultXform", prim_path=plane_path, prim_type="Plane")
-        plane_prim = stage.GetPrimAtPath(plane_path)
-        plane_prim.CreateAttribute("xformOp:scale", Sdf.ValueTypeNames.Double3, False).Set(Gf.Vec3d(10, 10, 1))
-
-        def sphere_lights(num):
-            lights = []
-            for i in range(num):
-                # "CylinderLight", "DiskLight", "DistantLight", "DomeLight", "RectLight", "SphereLight"
-                prim_type = "SphereLight"
-                next_free_path = omni.usd.get_stage_next_free_path(stage, f"/World/{prim_type}", False)
-                light_prim = stage.DefinePrim(next_free_path, prim_type)
-                UsdGeom.Xformable(light_prim).AddTranslateOp().Set((0.0, 0.0, 0.0))
-                UsdGeom.Xformable(light_prim).AddRotateXYZOp().Set((0.0, 0.0, 0.0))
-                UsdGeom.Xformable(light_prim).AddScaleOp().Set((1.0, 1.0, 1.0))
-                light_prim.CreateAttribute("inputs:enableColorTemperature", Sdf.ValueTypeNames.Bool).Set(True)
-                light_prim.CreateAttribute("inputs:colorTemperature", Sdf.ValueTypeNames.Float).Set(6500.0)
-                light_prim.CreateAttribute("inputs:radius", Sdf.ValueTypeNames.Float).Set(0.5)
-                light_prim.CreateAttribute("inputs:intensity", Sdf.ValueTypeNames.Float).Set(30000.0)
-                light_prim.CreateAttribute("inputs:color", Sdf.ValueTypeNames.Color3f).Set((1.0, 1.0, 1.0))
-                light_prim.CreateAttribute("inputs:exposure", Sdf.ValueTypeNames.Float).Set(0.0)
-                light_prim.CreateAttribute("inputs:diffuse", Sdf.ValueTypeNames.Float).Set(1.0)
-                light_prim.CreateAttribute("inputs:specular", Sdf.ValueTypeNames.Float).Set(1.0)
-                lights.append(light_prim)
-            return lights
-
-        async def run_randomizations_async(num_frames, lights, write_data=True, delay=0):
-            if write_data:
-                writer = rep.WriterRegistry.get("BasicWriter")
-                out_dir = os.path.join(os.getcwd(), "_out_rand_lights")
-                print(f"Writing data to {out_dir}..")
-                writer.initialize(output_dir=out_dir, rgb=True)
-                rp = rep.create.render_product("/OmniverseKit_Persp", (512, 512))
-                writer.attach(rp)
-
-            for _ in range(num_frames):
-                for light in lights:
-                    light.GetAttribute("xformOp:translate").Set(
-                        (np.random.uniform(-5, 5), np.random.uniform(-5, 5), np.random.uniform(4, 6))
-                    )
-                    scale_rand = np.random.uniform(0.5, 1.5)
-                    light.GetAttribute("xformOp:scale").Set((scale_rand, scale_rand, scale_rand))
-                    light.GetAttribute("inputs:colorTemperature").Set(np.random.normal(4500, 1500))
-                    light.GetAttribute("inputs:intensity").Set(np.random.normal(25000, 5000))
-                    light.GetAttribute("inputs:color").Set(
-                        (np.random.uniform(0.1, 0.9), np.random.uniform(0.1, 0.9), np.random.uniform(0.1, 0.9))
-                    )
-
-                if write_data:
-                    await rep.orchestrator.step_async(rt_subframes=16)
-                else:
-                    await omni.kit.app.get_app().next_update_async()
-                if delay > 0:
-                    await asyncio.sleep(delay)
-
-        num_frames = 10
-        lights = sphere_lights(10)
-        # asyncio.ensure_future(run_randomizations_async(num_frames=num_frames, lights=lights, delay=0.2))
-        await run_randomizations_async(num_frames=num_frames, lights=lights, delay=0.2)
-
-    async def test_randomizing_textures(self):
-        import asyncio
-        import os
-
-        import numpy as np
-        import omni.replicator.core as rep
-        import omni.usd
-        from isaacsim.core.utils.semantics import add_labels, get_labels
-        from isaacsim.storage.native import get_assets_root_path_async
-        from pxr import Gf, Sdf, UsdGeom, UsdShade
-
-        omni.usd.get_context().new_stage()
-        stage = omni.usd.get_context().get_stage()
-        dome_light = stage.DefinePrim("/World/DomeLight", "DomeLight")
-        dome_light.CreateAttribute("inputs:intensity", Sdf.ValueTypeNames.Float).Set(1000.0)
-
-        sphere = stage.DefinePrim("/World/Sphere", "Sphere")
-        UsdGeom.Xformable(sphere).AddTranslateOp().Set((0.0, 0.0, 1.0))
-        add_labels(sphere, labels=["sphere"], instance_name="class")
-
-        num_cubes = 10
-        for _ in range(num_cubes):
-            prim_type = "Cube"
-            next_free_path = omni.usd.get_stage_next_free_path(stage, f"/World/{prim_type}", False)
-            cube = stage.DefinePrim(next_free_path, prim_type)
-            UsdGeom.Xformable(cube).AddTranslateOp().Set(
-                (np.random.uniform(-3.5, 3.5), np.random.uniform(-3.5, 3.5), 1)
-            )
-            scale_rand = np.random.uniform(0.25, 0.5)
-            UsdGeom.Xformable(cube).AddScaleOp().Set((scale_rand, scale_rand, scale_rand))
-            add_labels(cube, labels=["cube"], instance_name="class")
-
-        plane_path = "/World/Plane"
-        omni.kit.commands.execute("CreateMeshPrimWithDefaultXform", prim_path=plane_path, prim_type="Plane")
-        plane_prim = stage.GetPrimAtPath(plane_path)
-        plane_prim.CreateAttribute("xformOp:scale", Sdf.ValueTypeNames.Double3, False).Set(Gf.Vec3d(10, 10, 1))
-
-        def get_shapes():
-            stage = omni.usd.get_context().get_stage()
-            shapes = []
-            for prim in stage.Traverse():
-                labels = get_labels(prim)
-                if class_labels := labels.get("class"):
-                    if "cube" in class_labels or "sphere" in class_labels:
-                        shapes.append(prim)
-            return shapes
-
-        shapes = get_shapes()
-
-        def create_omnipbr_material(mtl_url, mtl_name, mtl_path):
-            stage = omni.usd.get_context().get_stage()
-            omni.kit.commands.execute("CreateMdlMaterialPrim", mtl_url=mtl_url, mtl_name=mtl_name, mtl_path=mtl_path)
-            material_prim = stage.GetPrimAtPath(mtl_path)
-            shader = UsdShade.Shader(omni.usd.get_shader_from_material(material_prim, get_prim=True))
-
-            # Add value inputs
-            shader.CreateInput("diffuse_color_constant", Sdf.ValueTypeNames.Color3f)
-            shader.CreateInput("reflection_roughness_constant", Sdf.ValueTypeNames.Float)
-            shader.CreateInput("metallic_constant", Sdf.ValueTypeNames.Float)
-
-            # Add texture inputs
-            shader.CreateInput("diffuse_texture", Sdf.ValueTypeNames.Asset)
-            shader.CreateInput("reflectionroughness_texture", Sdf.ValueTypeNames.Asset)
-            shader.CreateInput("metallic_texture", Sdf.ValueTypeNames.Asset)
-
-            # Add other attributes
-            shader.CreateInput("project_uvw", Sdf.ValueTypeNames.Bool)
-
-            # Add texture scale and rotate
-            shader.CreateInput("texture_scale", Sdf.ValueTypeNames.Float2)
-            shader.CreateInput("texture_rotate", Sdf.ValueTypeNames.Float)
-
-            material = UsdShade.Material(material_prim)
-            return material
-
-        def create_materials(num):
-            MDL = "OmniPBR.mdl"
-            mtl_name, _ = os.path.splitext(MDL)
-            MAT_PATH = "/World/Looks"
-            materials = []
-            for _ in range(num):
-                prim_path = omni.usd.get_stage_next_free_path(stage, f"{MAT_PATH}/{mtl_name}", False)
-                mat = create_omnipbr_material(mtl_url=MDL, mtl_name=mtl_name, mtl_path=prim_path)
-                materials.append(mat)
-            return materials
-
-        materials = create_materials(len(shapes))
-
-        async def run_randomizations_async(num_frames, materials, textures, write_data=True, delay=0):
-            if write_data:
-                writer = rep.WriterRegistry.get("BasicWriter")
-                out_dir = os.path.join(os.getcwd(), "_out_rand_textures")
-                print(f"Writing data to {out_dir}..")
-                writer.initialize(output_dir=out_dir, rgb=True)
-                rp = rep.create.render_product("/OmniverseKit_Persp", (512, 512))
-                writer.attach(rp)
-
-            # Apply the new materials and store the initial ones to reassign later
-            initial_materials = {}
-            for i, shape in enumerate(shapes):
-                cur_mat, _ = UsdShade.MaterialBindingAPI(shape).ComputeBoundMaterial()
-                initial_materials[shape] = cur_mat
-                UsdShade.MaterialBindingAPI(shape).Bind(materials[i], UsdShade.Tokens.strongerThanDescendants)
-
-            for _ in range(num_frames):
-                for mat in materials:
-                    shader = UsdShade.Shader(omni.usd.get_shader_from_material(mat, get_prim=True))
-                    diffuse_texture = np.random.choice(textures)
-                    shader.GetInput("diffuse_texture").Set(diffuse_texture)
-                    project_uvw = np.random.choice([True, False], p=[0.9, 0.1])
-                    shader.GetInput("project_uvw").Set(bool(project_uvw))
-                    texture_scale = np.random.uniform(0.1, 1)
-                    shader.GetInput("texture_scale").Set((texture_scale, texture_scale))
-                    texture_rotate = np.random.uniform(0, 45)
-                    shader.GetInput("texture_rotate").Set(texture_rotate)
-
-                if write_data:
-                    await rep.orchestrator.step_async(rt_subframes=4)
-                else:
-                    await omni.kit.app.get_app().next_update_async()
-                if delay > 0:
-                    await asyncio.sleep(delay)
-
-            # Reassign the initial materials
-            for shape, mat in initial_materials.items():
-                if mat:
-                    UsdShade.MaterialBindingAPI(shape).Bind(mat, UsdShade.Tokens.strongerThanDescendants)
-                else:
-                    UsdShade.MaterialBindingAPI(shape).UnbindAllBindings()
-
-        assets_root_path = await get_assets_root_path_async()
-        textures = [
-            assets_root_path + "/NVIDIA/Materials/vMaterials_2/Ground/textures/aggregate_exposed_diff.jpg",
-            assets_root_path + "/NVIDIA/Materials/vMaterials_2/Ground/textures/gravel_track_ballast_diff.jpg",
-            assets_root_path
-            + "/NVIDIA/Materials/vMaterials_2/Ground/textures/gravel_track_ballast_multi_R_rough_G_ao.jpg",
-            assets_root_path + "/NVIDIA/Materials/vMaterials_2/Ground/textures/rough_gravel_rough.jpg",
-        ]
-
-        num_frames = 10
-        # asyncio.ensure_future(run_randomizations_async(num_frames, materials, textures, delay=0.2))
-        await run_randomizations_async(num_frames, materials, textures, delay=0.2)
-
-    async def test_sequential_randomizations(self):
+        Returns:
+            None.
+        """
         import asyncio
         import itertools
-        import os
 
         import numpy as np
         import omni.replicator.core as rep
@@ -271,8 +58,11 @@ class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
         from isaacsim.storage.native import get_assets_root_path_async
         from pxr import Gf, Usd, UsdGeom, UsdLux
 
+        sphere_scan_dir = tempfile.mkdtemp(prefix="test_rand_sphere_scan_")
+        print(f"Output directory: {sphere_scan_dir}")
+
         # Fibonacci sphere algorithm: https://arxiv.org/pdf/0912.4540
-        def next_point_on_sphere(idx, num_points, radius=1, origin=(0, 0, 0)):
+        def next_point_on_sphere(idx: Any, num_points: Any, radius: int = 1, origin: Any = (0, 0, 0)) -> None:
             offset = 2.0 / num_points
             inc = np.pi * (3.0 - np.sqrt(5.0))
             z = ((idx * offset) - 1) + (offset / 2)
@@ -282,56 +72,76 @@ class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
             x = np.sin(phi) * r
             return [(x * radius) + origin[0], (y * radius) + origin[1], (z * radius) + origin[2]]
 
-        assets_root_path = await get_assets_root_path_async()
-        FORKLIFT_PATH = assets_root_path + "/Isaac/Props/Forklift/forklift.usd"
-        PALLET_PATH = assets_root_path + "/Isaac/Props/Pallet/pallet.usd"
-        BIN_PATH = assets_root_path + "/Isaac/Props/KLT_Bin/small_KLT_visual.usd"
-
-        omni.usd.get_context().new_stage()
-        stage = omni.usd.get_context().get_stage()
-
-        dome_light = UsdLux.DomeLight.Define(stage, "/World/Lights/DomeLight")
-        dome_light.GetIntensityAttr().Set(1000)
-
-        forklift_prim = stage.DefinePrim("/World/Forklift", "Xform")
-        forklift_prim.GetReferences().AddReference(FORKLIFT_PATH)
-        if not forklift_prim.GetAttribute("xformOp:translate"):
-            UsdGeom.Xformable(forklift_prim).AddTranslateOp()
-        forklift_prim.GetAttribute("xformOp:translate").Set((-4.5, -4.5, 0))
-
-        pallet_prim = stage.DefinePrim("/World/Pallet", "Xform")
-        pallet_prim.GetReferences().AddReference(PALLET_PATH)
-        if not pallet_prim.GetAttribute("xformOp:translate"):
-            UsdGeom.Xformable(pallet_prim).AddTranslateOp()
-        if not pallet_prim.GetAttribute("xformOp:rotateXYZ"):
-            UsdGeom.Xformable(pallet_prim).AddRotateXYZOp()
-
-        bin_prim = stage.DefinePrim("/World/Bin", "Xform")
-        bin_prim.GetReferences().AddReference(BIN_PATH)
-        if not bin_prim.GetAttribute("xformOp:translate"):
-            UsdGeom.Xformable(bin_prim).AddTranslateOp()
-        if not bin_prim.GetAttribute("xformOp:rotateXYZ"):
-            UsdGeom.Xformable(bin_prim).AddRotateXYZOp()
-
-        cam = stage.DefinePrim("/World/Camera", "Camera")
-        if not cam.GetAttribute("xformOp:translate"):
-            UsdGeom.Xformable(cam).AddTranslateOp()
-        if not cam.GetAttribute("xformOp:orient"):
-            UsdGeom.Xformable(cam).AddOrientOp()
-
         async def run_randomizations_async(
-            num_frames, dome_light, dome_textures, pallet_prim, bin_prim, write_data=True, delay=0
-        ):
-            if write_data:
-                writer = rep.WriterRegistry.get("BasicWriter")
-                out_dir = os.path.join(os.getcwd(), "_out_rand_sphere_scan")
-                print(f"Writing data to {out_dir}..")
-                writer.initialize(output_dir=out_dir, rgb=True)
-                rp_persp = rep.create.render_product("/OmniverseKit_Persp", (512, 512), name="PerspView")
-                rp_cam = rep.create.render_product(str(cam.GetPath()), (512, 512), name="SphereView")
-                writer.attach([rp_cam, rp_persp])
+            num_frames: Any,
+            forklift_path: Any,
+            pallet_path: Any,
+            bin_path: Any,
+            dome_textures: Any,
+            write_data: Any,
+            delay: Any | None = None,
+        ) -> Any:
+            """Render perspective and sphere-scan views while cycling dome textures and object poses.
 
-            textures_cycle = itertools.cycle(dome_textures)
+            Args:
+                num_frames: Number of frames to run.
+                forklift_path: Asset-relative forklift path.
+                pallet_path: Asset-relative pallet path.
+                bin_path: Asset-relative bin path.
+                dome_textures: Asset-relative dome texture paths to cycle through.
+                write_data: Whether to write RGB data with BasicWriter.
+                delay: Optional delay between frames.
+
+            Returns:
+                None.
+            """
+            assets_root_path = await get_assets_root_path_async()
+
+            await omni.usd.get_context().new_stage_async()
+            stage = omni.usd.get_context().get_stage()
+
+            dome_light = UsdLux.DomeLight.Define(stage, "/World/Lights/DomeLight")
+            dome_light.GetIntensityAttr().Set(1000)
+
+            forklift_prim = stage.DefinePrim("/World/Forklift", "Xform")
+            forklift_prim.GetReferences().AddReference(assets_root_path + forklift_path)
+            if not forklift_prim.GetAttribute("xformOp:translate"):
+                UsdGeom.Xformable(forklift_prim).AddTranslateOp()
+            forklift_prim.GetAttribute("xformOp:translate").Set((-4.5, -4.5, 0))
+
+            pallet_prim = stage.DefinePrim("/World/Pallet", "Xform")
+            pallet_prim.GetReferences().AddReference(assets_root_path + pallet_path)
+            if not pallet_prim.GetAttribute("xformOp:translate"):
+                UsdGeom.Xformable(pallet_prim).AddTranslateOp()
+            if not pallet_prim.GetAttribute("xformOp:rotateXYZ"):
+                UsdGeom.Xformable(pallet_prim).AddRotateXYZOp()
+
+            bin_prim = stage.DefinePrim("/World/Bin", "Xform")
+            bin_prim.GetReferences().AddReference(assets_root_path + bin_path)
+            if not bin_prim.GetAttribute("xformOp:translate"):
+                UsdGeom.Xformable(bin_prim).AddTranslateOp()
+            if not bin_prim.GetAttribute("xformOp:rotateXYZ"):
+                UsdGeom.Xformable(bin_prim).AddRotateXYZOp()
+
+            view_cam = stage.DefinePrim("/World/Camera", "Camera")
+            if not view_cam.GetAttribute("xformOp:translate"):
+                UsdGeom.Xformable(view_cam).AddTranslateOp()
+            if not view_cam.GetAttribute("xformOp:orient"):
+                UsdGeom.Xformable(view_cam).AddOrientOp()
+
+            dome_textures_full = [assets_root_path + tex for tex in dome_textures]
+            textures_cycle = itertools.cycle(dome_textures_full)
+
+            if write_data:
+                print(f"Writing data to {sphere_scan_dir}..")
+                backend = rep.backends.get("DiskBackend")
+                backend.initialize(output_dir=sphere_scan_dir)
+                writer = rep.WriterRegistry.get("BasicWriter")
+                writer.initialize(backend=backend, rgb=True)
+                persp_cam = rep.functional.create.camera(position=(5, 5, 5), look_at=(0, 0, 0), name="PerspCamera")
+                rp_persp = rep.create.render_product(persp_cam, (512, 512), name="PerspView")
+                rp_view = rep.create.render_product(view_cam, (512, 512), name="SphereView")
+                writer.attach([rp_view, rp_persp])
 
             bb_cache = UsdGeom.BBoxCache(time=Usd.TimeCode.Default(), includedPurposes=[UsdGeom.Tokens.default_])
             pallet_size = bb_cache.ComputeWorldBound(pallet_prim).GetRange().GetSize()
@@ -380,48 +190,80 @@ class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
                 rand_radius = np.random.normal(3, 0.5) * pallet_length
                 bin_pos = omni.usd.get_world_transform_matrix(bin_prim).ExtractTranslation()
                 cam_pos = next_point_on_sphere(i, num_points=num_frames, radius=rand_radius, origin=bin_pos)
-                cam.GetAttribute("xformOp:translate").Set(Gf.Vec3d(*cam_pos))
+                view_cam.GetAttribute("xformOp:translate").Set(Gf.Vec3d(*cam_pos))
 
                 eye = Gf.Vec3d(*cam_pos)
                 target = Gf.Vec3d(*bin_pos)
                 up_axis = Gf.Vec3d(0, 0, 1)
                 look_at_quatd = Gf.Matrix4d().SetLookAt(eye, target, up_axis).GetInverse().ExtractRotation().GetQuat()
-                cam.GetAttribute("xformOp:orient").Set(Gf.Quatf(look_at_quatd))
+                view_cam.GetAttribute("xformOp:orient").Set(Gf.Quatf(look_at_quatd))
 
                 if write_data:
-                    await rep.orchestrator.step_async(rt_subframes=4)
+                    await rep.orchestrator.step_async(rt_subframes=4, delta_time=0.0)
                 else:
                     await omni.kit.app.get_app().next_update_async()
-                if delay > 0:
+                # Optional delay between frames to better visualize the randomization in the viewport
+                if delay is not None and delay > 0:
                     await asyncio.sleep(delay)
 
-        num_frames = 90
-        dome_textures = [
-            assets_root_path + "/NVIDIA/Assets/Skies/Cloudy/champagne_castle_1_4k.hdr",
-            assets_root_path + "/NVIDIA/Assets/Skies/Clear/evening_road_01_4k.hdr",
-            assets_root_path + "/NVIDIA/Assets/Skies/Clear/mealie_road_4k.hdr",
-            assets_root_path + "/NVIDIA/Assets/Skies/Clear/qwantani_4k.hdr",
+            # Wait for the data to be written to disk and cleanup writer and render products
+            if write_data:
+                await rep.orchestrator.wait_until_complete_async()
+                writer.detach()
+                rp_persp.destroy()
+                rp_view.destroy()
+
+        NUM_FRAMES = 90
+        FORKLIFT_PATH = "/Isaac/Props/Forklift/forklift.usd"
+        PALLET_PATH = "/Isaac/Props/Pallet/pallet.usd"
+        BIN_PATH = "/Isaac/Props/KLT_Bin/small_KLT_visual.usd"
+        DOME_TEXTURES = [
+            "/NVIDIA/Assets/Skies/Cloudy/champagne_castle_1_4k.hdr",
+            "/NVIDIA/Assets/Skies/Clear/evening_road_01_4k.hdr",
+            "/NVIDIA/Assets/Skies/Clear/mealie_road_4k.hdr",
+            "/NVIDIA/Assets/Skies/Clear/qwantani_4k.hdr",
         ]
         # asyncio.ensure_future(
-        #     run_randomizations_async(num_frames, dome_light, dome_textures, pallet_prim, bin_prim, delay=0.2)
+        #     run_randomizations_async(
+        #         NUM_FRAMES, FORKLIFT_PATH, PALLET_PATH, BIN_PATH, DOME_TEXTURES, write_data=True, delay=0.2
+        #     )
         # )
-        await run_randomizations_async(num_frames, dome_light, dome_textures, pallet_prim, bin_prim, delay=0.2)
 
-    async def test_physics_based_randomized_volume_filling(self):
-        import asyncio
+        # Test
+        test_num_frames = 4
+        await run_randomizations_async(
+            test_num_frames, FORKLIFT_PATH, PALLET_PATH, BIN_PATH, DOME_TEXTURES, write_data=True
+        )
+
+        folder_contents_success = validate_folder_contents(
+            path=sphere_scan_dir, expected_counts={"png": test_num_frames * 2}, recursive=True
+        )
+        self.assertTrue(folder_contents_success, f"Output directory contents validation failed for {sphere_scan_dir}")
+
+    async def test_randomize_physics_based_volume_filling(self) -> None:
+        """Stack random boxes on pallets with physics walls and validate a final BasicWriter capture."""
         import random
         from itertools import chain
 
         import carb
         import omni.kit.app
+        import omni.physx
+        import omni.replicator.core as rep
         import omni.usd
-        from isaacsim.core.utils.bounds import compute_aabb, compute_obb, create_bbox_cache
-        from isaacsim.storage.native import get_assets_root_path
-        from omni.physx import get_physx_simulation_interface
+        from isaacsim.storage.native import get_assets_root_path_async
         from pxr import Gf, PhysicsSchemaTools, PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade, UsdUtils
 
+        box_stacking_dir = tempfile.mkdtemp(prefix="test_box_stacking_")
+        print(f"Output directory: {box_stacking_dir}")
+
         # Add transformation properties to the prim (if not already present)
-        def set_transform_attributes(prim, location=None, orientation=None, rotation=None, scale=None):
+        def set_transform_attributes(
+            prim: Any,
+            location: Any | None = None,
+            orientation: Any | None = None,
+            rotation: Any | None = None,
+            scale: Any | None = None,
+        ) -> None:
             if location is not None:
                 if not prim.HasAttribute("xformOp:translate"):
                     UsdGeom.Xformable(prim).AddTranslateOp()
@@ -440,7 +282,7 @@ class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
                 prim.GetAttribute("xformOp:scale").Set(scale)
 
         # Enables collisions with the asset (without rigid body dynamics the asset will be static)
-        def add_colliders(prim):
+        def add_colliders(prim: Any) -> None:
             # Iterate descendant prims (including root) and add colliders to mesh or primitive types
             for desc_prim in Usd.PrimRange(prim):
                 if desc_prim.IsA(UsdGeom.Mesh) or desc_prim.IsA(UsdGeom.Gprim):
@@ -460,7 +302,9 @@ class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
                     mesh_collision_api.CreateApproximationAttr().Set("convexHull")
 
         # Enables rigid body dynamics (physics simulation) on the prim (having valid colliders is recommended)
-        def add_rigid_body_dynamics(prim, disable_gravity=False, angular_damping=None):
+        def add_rigid_body_dynamics(
+            prim: Any, disable_gravity: bool = False, angular_damping: Any | None = None
+        ) -> Any:
             # Physics
             if not prim.HasAPI(UsdPhysics.RigidBodyAPI):
                 rigid_body_api = UsdPhysics.RigidBodyAPI.Apply(prim)
@@ -477,24 +321,45 @@ class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
                 physx_rigid_body_api.CreateAngularDampingAttr().Set(angular_damping)
 
         # Create a new prim with the provided asset URL and transform properties
-        def create_asset(stage, asset_url, path, location=None, rotation=None, orientation=None, scale=None):
+        def create_asset(
+            stage: Any,
+            asset_url: Any,
+            path: Any,
+            location: Any | None = None,
+            rotation: Any | None = None,
+            orientation: Any | None = None,
+            scale: Any | None = None,
+        ) -> Any:
             prim_path = omni.usd.get_stage_next_free_path(stage, path, False)
-            reference_url = asset_url if asset_url.startswith("omniverse://") else get_assets_root_path() + asset_url
             prim = stage.DefinePrim(prim_path, "Xform")
-            prim.GetReferences().AddReference(reference_url)
+            prim.GetReferences().AddReference(asset_url)
             set_transform_attributes(prim, location=location, rotation=rotation, orientation=orientation, scale=scale)
             return prim
 
         # Create a new prim with the provided asset URL and transform properties including colliders
         def create_asset_with_colliders(
-            stage, asset_url, path, location=None, rotation=None, orientation=None, scale=None
-        ):
+            stage: Any,
+            asset_url: Any,
+            path: Any,
+            location: Any | None = None,
+            rotation: Any | None = None,
+            orientation: Any | None = None,
+            scale: Any | None = None,
+        ) -> Any:
             prim = create_asset(stage, asset_url, path, location, rotation, orientation, scale)
             add_colliders(prim)
             return prim
 
         # Create collision walls around the top surface of the prim with the given height and thickness
-        def create_collision_walls(stage, prim, bbox_cache=None, height=2, thickness=0.3, material=None, visible=False):
+        def create_collision_walls(
+            stage: Any,
+            prim: Any,
+            bbox_cache: Any | None = None,
+            height: int = 2,
+            thickness: float = 0.3,
+            material: Any | None = None,
+            visible: bool = False,
+        ) -> None:
             # Use the untransformed axis-aligned bounding box to calculate the prim surface size and center
             if bbox_cache is None:
                 bbox_cache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), includedPurposes=[UsdGeom.Tokens.default_])
@@ -546,7 +411,9 @@ class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
             return collision_walls
 
         # Slide the assets independently in perpendicular directions and then pull them all together towards the given center
-        async def apply_forces_async(stage, boxes, pallet, strength=550, strength_center_multiplier=2):
+        async def apply_forces_async(
+            stage: Any, boxes: Any, pallet: Any, strength: int = 550, strength_center_multiplier: int = 2
+        ) -> Any:
             timeline = omni.timeline.get_timeline_interface()
             timeline.play()
             # Get the pallet center and forward vector to apply forces in the perpendicular directions and towards the center
@@ -556,7 +423,7 @@ class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
             force_forward = Gf.Vec3d(pallet_rot.TransformDir(Gf.Vec3d(1, 0, 0))) * strength
             force_right = Gf.Vec3d(pallet_rot.TransformDir(Gf.Vec3d(0, 1, 0))) * strength
 
-            physx_api = get_physx_simulation_interface()
+            physx_simulation_interface = omni.physx.get_physx_simulation_interface()
             stage_id = UsdUtils.StageCache.Get().GetId(stage).ToLongInt()
             for box_prim in boxes:
                 body_path = PhysicsSchemaTools.sdfPathToInt(box_prim.GetPath())
@@ -566,18 +433,23 @@ class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
                         Usd.TimeCode.Default()
                     )
                     box_position = carb.Float3(*box_tf.ExtractTranslation())
-                    physx_api.apply_force_at_pos(stage_id, body_path, carb.Float3(force), box_position, "Force")
+                    physx_simulation_interface.apply_force_at_pos(
+                        stage_id, body_path, carb.Float3(*force), box_position
+                    )
                     for _ in range(10):
                         await omni.kit.app.get_app().next_update_async()
 
-            # Pull all box at once to the pallet center
+            # Pull all boxes at once to the pallet center
             for box_prim in boxes:
                 body_path = PhysicsSchemaTools.sdfPathToInt(box_prim.GetPath())
                 box_tf: Gf.Matrix4d = UsdGeom.Xformable(box_prim).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
                 box_location = box_tf.ExtractTranslation()
                 force_to_center = (pallet_center - box_location) * strength * strength_center_multiplier
-                physx_api.apply_force_at_pos(
-                    stage_id, body_path, carb.Float3(*force_to_center), carb.Float3(*box_location)
+                physx_simulation_interface.apply_force_at_pos(
+                    stage_id,
+                    body_path,
+                    carb.Float3(*force_to_center),
+                    carb.Float3(*box_location),
                 )
             for _ in range(20):
                 await omni.kit.app.get_app().next_update_async()
@@ -585,8 +457,12 @@ class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
 
         # Create a new stage and and run the example scenario
         async def stack_boxes_on_pallet_async(
-            pallet_prim, boxes_urls_and_weights, num_boxes, drop_height=1.5, drop_margin=0.2
-        ):
+            pallet_prim: Any,
+            boxes_urls_and_weights: Any,
+            num_boxes: Any,
+            drop_height: float = 1.5,
+            drop_margin: float = 0.2,
+        ) -> None:
             pallet_path = pallet_prim.GetPath()
             print(f"[BoxStacking] Running scenario for pallet {pallet_path} with {num_boxes} boxes..")
             stage = omni.usd.get_context().get_stage()
@@ -681,22 +557,27 @@ class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
             return boxes
 
         # Run the example scenario
-        async def run_box_stacking_scenarios_async(num_pallets=1, env_url=None):
+        async def run_box_stacking_scenarios_async(
+            num_pallets: Any, env_url: Any | None = None, write_data: bool = False
+        ) -> None:
+            # Get assets root path once for all asset loading operations
+            assets_root_path = await get_assets_root_path_async()
+
             # List of pallets and boxes to randomly choose from with their respective weights
             pallets_urls_and_weights = [
-                ("/Isaac/Environments/Simple_Warehouse/Props/SM_PaletteA_01.usd", 0.25),
-                ("/Isaac/Environments/Simple_Warehouse/Props/SM_PaletteA_02.usd", 0.75),
+                (assets_root_path + "/Isaac/Environments/Simple_Warehouse/Props/SM_PaletteA_01.usd", 0.25),
+                (assets_root_path + "/Isaac/Environments/Simple_Warehouse/Props/SM_PaletteA_02.usd", 0.75),
             ]
             boxes_urls_and_weights = [
-                ("/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxA_01.usd", 0.02),
-                ("/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxB_01.usd", 0.06),
-                ("/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxC_01.usd", 0.12),
-                ("/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxD_01.usd", 0.80),
+                (assets_root_path + "/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxA_01.usd", 0.02),
+                (assets_root_path + "/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxB_01.usd", 0.06),
+                (assets_root_path + "/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxC_01.usd", 0.12),
+                (assets_root_path + "/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxD_01.usd", 0.80),
             ]
 
             # Load a predefined or create a new stage
             if env_url is not None:
-                env_path = env_url if env_url.startswith("omniverse://") else get_assets_root_path() + env_url
+                env_path = env_url if env_url.startswith("omniverse://") else assets_root_path + env_url
                 omni.usd.get_context().open_stage(env_path)
                 stage = omni.usd.get_context().get_stage()
             else:
@@ -762,4 +643,33 @@ class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
                 await omni.kit.app.get_app().next_update_async()
             timeline.pause()
 
-        await run_box_stacking_scenarios_async(num_pallets=1)
+            if write_data:
+                print(f"Writing data to {box_stacking_dir}..")
+                backend = rep.backends.get("DiskBackend")
+                backend.initialize(output_dir=box_stacking_dir)
+                writer = rep.WriterRegistry.get("BasicWriter")
+                writer.initialize(backend=backend, rgb=True)
+                cam = rep.functional.create.camera(position=(5, -5, 2), look_at=(0, 0, 0), name="PalletCamera")
+                rp = rep.create.render_product(cam, resolution=(512, 512))
+                writer.attach(rp)
+
+                # Capture the data and wait for the data to be written to disk
+                await rep.orchestrator.step_async(rt_subframes=8)
+
+                # Wait for the data to be written to disk and cleanup
+                await rep.orchestrator.wait_until_complete_async()
+                writer.detach()
+                rp.destroy()
+
+        # asyncio.ensure_future(run_box_stacking_scenarios_async(num_pallets=1, write_data=True))
+        # asyncio.ensure_future(
+        #     run_box_stacking_scenarios_async(
+        #         num_pallets=6, env_url="/Isaac/Environments/Simple_Warehouse/warehouse.usd", write_data=True
+        #     )
+        # )
+
+        # Test
+        await run_box_stacking_scenarios_async(num_pallets=1, write_data=True)
+
+        folder_contents_success = validate_folder_contents(path=box_stacking_dir, expected_counts={"png": 1})
+        self.assertTrue(folder_contents_success, f"Output directory contents validation failed for {box_stacking_dir}")

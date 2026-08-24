@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,58 +12,97 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""UI builder for managing Jupyter Code Editor extension menu integration."""
+
 import os
 import weakref
 import webbrowser
+from collections.abc import Callable
 
 import carb
 
 
 class UIBuilder:
-    """Manage extension UI"""
+    """Manage extension UI.
 
-    def __init__(self, menu_name, menu_item_name, host, port, get_url_callback):
+    Args:
+        ext_name: Extension name used for action registration.
+        menu_name: Name of the menu where the item will be added.
+        menu_item_name: Name of the menu item to display.
+        host: Host address for the Jupyter server.
+        port: Port number for the Jupyter server.
+        get_url_callback: Callback function to retrieve the display URL.
+    """
+
+    def __init__(
+        self,
+        ext_name: str,
+        menu_name: str,
+        menu_item_name: str,
+        host: str,
+        port: int,
+        get_url_callback: Callable[[], str],
+    ) -> None:
         self._menu_items = []
 
+        self._ext_name = ext_name
         self._host = host
         self._port = port
         self._menu_name = menu_name
         self._menu_item_name = menu_item_name
         self._get_url_callback = get_url_callback
 
-        # get application folder
         self._app_folder = carb.settings.get_settings().get_as_string("/app/folder")
         if not self._app_folder:
             self._app_folder = carb.tokens.get_tokens_interface().resolve("${app}")
         self._app_folder = os.path.normpath(os.path.join(self._app_folder, os.pardir))
 
-    def startup(self):
-        """Create menu item"""
+    def startup(self) -> None:
+        """Create menu item."""
         try:
+            import omni.kit.actions.core
             from omni.kit.menu.utils import MenuItemDescription, add_menu_items
+
+            action_registry = omni.kit.actions.core.get_action_registry()
+            action_registry.register_action(
+                self._ext_name,
+                "launch_jupyter",
+                lambda p=weakref.proxy(self): p._launch(),
+                display_name=self._menu_item_name,
+                description=f"Launch {self._menu_item_name}",
+            )
 
             self._menu_items = [
                 MenuItemDescription(
                     name=self._menu_item_name,
-                    onclick_fn=lambda p=weakref.proxy(self): p._launch(),
+                    onclick_action=(self._ext_name, "launch_jupyter"),
                 )
             ]
             add_menu_items(self._menu_items, self._menu_name)
         except ImportError:
             pass
 
-    def shutdown(self):
-        """Clean up menu item"""
+    def shutdown(self) -> None:
+        """Clean up menu item."""
         try:
+            import omni.kit.actions.core
             from omni.kit.menu.utils import remove_menu_items
 
             remove_menu_items(self._menu_items, "Window")
+            action_registry = omni.kit.actions.core.get_action_registry()
+            action_registry.deregister_action(self._ext_name, "launch_jupyter")
         except ImportError:
             pass
         self._menu_items = []
 
-    def _launch(self, *args, **kwargs):
-        """Open Jupyter in the default browser"""
+    def _launch(self, *args: object, **kwargs: object) -> None:
+        """Open Jupyter in the default browser.
+
+        Args:
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+        """
         url = f"http://127.0.0.1:{self._port}"
         carb.log_info(f"Open Jupyter in the default browser: {url}")
         webbrowser.open_new_tab(url)

@@ -1,5 +1,61 @@
 # Changelog
 
+## [0.4.8] - 2026-06-10
+### Fixed
+- Fix linter errors and missing or incomplete docstrings.
+
+## [0.4.7] - 2026-06-09
+### Changed
+- Teleop build validates NuRec render prerequisites (`setup_for_rendering`) on the loaded stage and aborts with a warning notification if one is unmet (e.g. `omni.rtx.spg` not enabled), instead of recording a black scene.
+- For SPG scenes the chase viewport renders through the export's authored PPISP graph via `route_chase_through_ppisp`; non-SPG scenes point the viewport at the chase camera as before.
+- Added a dependency on `isaacsim.replicator.nurec_utils`.
+
+## [0.4.6] - 2026-06-07
+### Changed
+- `_cache_stage` now copies the input scene (and the files it needs) into a temporary folder before loading, then opens the stage from that copy. This removes the flatten + strip-kit-prims path and the USDZ re-export; USDZ inputs are copied as-is so every package member (including SPG `.cu.lua` launchers) is preserved, and recording start is much faster for large NuRec scenes.
+- The recording panel now drives recordings through the shared `RecordingSession`, so the UI and headless scripts build and record scenes through the same path.
+
+## [0.4.5] - 2026-06-04
+### Removed
+- Stale `multiGpu` disable from `[[test]]` args; the Kit 110.1.1 multi-GPU startup crash no longer reproduces.
+
+## [0.4.4] - 2026-05-13
+### Changed
+- Clarified the `_cache_stage` docstring around what `export_as_stage` actually inlines.
+
+## [0.4.3] - 2026-04-23
+### Removed
+- Remove the `omni.isaac.ml_archive` test dependency
+
+## [0.4.2] - 2026-04-22
+### Fixed
+- Call `save_sensor_overrides` on recording start to persist camera calibration changes made in the UI
+- Use `export_as_stage` when caching the scene stage to prevent black images on replay
+
+## [0.4.1] - 2026-04-18
+### Changed
+- Added return type annotations
+
+## [0.4.0] - 2026-04-08
+### Changed
+- Migrate from deprecated `isaacsim.replicator.mobility_gen` to `isaacsim.replicator.experimental.mobility_gen`
+- Replace legacy world-based simulation control with `SimulationManager` and `SimulationEvent.PHYSICS_POST_STEP` callback
+- Replace `set_active_viewport_camera` with `ViewportManager.set_camera`
+- Replace `objects.GroundPlane` (core.api) with `GroundPlane` from `isaacsim.core.experimental.objects`
+- Use `save_stage` without deprecated `save_and_reload_in_place` argument
+
+## [0.3.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [0.2.0] - 2026-02-06
+### Added
+- Support loading usdz asset
+
+## [0.1.10] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [0.1.9] - 2025-09-30
 ### Fixed
 - Add dialog message for incorrect occupancy map paths

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,18 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""High level wrapper for manipulating prims that have Deformable Schema applied and their attributes."""
+
 from __future__ import annotations
 
 import weakref
-from typing import Literal
+from typing import Any, Literal
 
 import carb
+import carb.eventdispatcher
 import isaacsim.core.experimental.utils.backend as backend_utils
 import isaacsim.core.experimental.utils.ops as ops_utils
 import isaacsim.core.experimental.utils.prim as prim_utils
 import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni.physics.tensors
+import omni.timeline
 import warp as wp
 from isaacsim.core.simulation_manager import SimulationManager
 from omni.physx import get_physx_cooking_interface
@@ -39,6 +43,26 @@ from .xform_prim import XformPrim
 def _check_or_apply_deformable_schema(
     stage: Usd.Stage, path: str, deformable_type: Literal["surface", "volume"] | None
 ) -> tuple[Literal["wrap", "create"], Literal["surface", "volume"]]:
+    """Check if the deformable schema exists on a prim and apply it if needed.
+
+    Validates that the prim is suitable for deformable body physics and either wraps an existing
+    deformable schema or creates a new one. Handles Mesh (surface), TetMesh (volume), and Xform
+    prims with nested meshes.
+
+    Args:
+        stage: The USD stage containing the prim.
+        path: Path to the prim to check or modify.
+        deformable_type: Type of deformable body to create if schema doesn't exist.
+            If None, inferred from prim type.
+
+    Returns:
+        A tuple of (action, deformable_type) where action is "wrap" if existing schema was found
+        or "create" if new schema was applied.
+
+    Raises:
+        ValueError: If the prim has conflicting APIs, invalid geometry, or schema setup fails.
+        AssertionError: If deformable_type conflicts with prim type.
+    """
     prim = stage.GetPrimAtPath(path)
     # check for conflicting APIs
     if physx_bindings.hasconflictingapis_DeformableBodyAPI(prim, False):  # don't check itself (deformable schema)
@@ -154,12 +178,6 @@ class DeformablePrim(XformPrim):
 
     .. warning::
 
-        The deformable prims require the Deformable feature (beta) to be enabled.
-        Deformable feature (beta) can be enabled in *apps/.kit* experience files by setting
-        ``physics.enableDeformableBeta = true`` under the ``[settings.persistent]`` section.
-
-    .. warning::
-
         The current ``omni.physics.tensors`` implementation does not support ``list[str]``
         as input for deformable body paths. This limitation will be fixed in the future releases.
         An error message will be logged if a list of paths is provided.
@@ -189,7 +207,6 @@ class DeformablePrim(XformPrim):
             If not defined, the type will be inferred from the prims.
 
     Raises:
-        RuntimeError: If the Deformable feature (beta) is disabled.
         ValueError: If no prims are found matching the specified path(s).
         AssertionError: If both positions and translations are specified.
 
@@ -226,16 +243,7 @@ class DeformablePrim(XformPrim):
         # DeformablePrim
         deformable_type: Literal["surface", "volume"] | None = None,
     ) -> None:
-        # check for deformable feature (beta)
-        setting_name = physx_bindings.SETTING_ENABLE_DEFORMABLE_BETA
-        enabled = carb.settings.get_settings().get(setting_name)
-        if not enabled:
-            setting_name = (setting_name[1:] if setting_name.startswith("/") else setting_name).replace("/", ".")
-            raise RuntimeError(
-                "Deformable bodies require Deformable feature (beta) to be enabled. "
-                f"Enable it in .kit experience settings ('{setting_name} = true') to use them."
-            )
-        # get  prims
+        # get prims
         stage = stage_utils.get_current_stage(backend="usd")
         existent_paths, nonexistent_paths = self.resolve_paths(paths)
         assert (
@@ -279,19 +287,27 @@ class DeformablePrim(XformPrim):
             scales=scales,
             reset_xform_op_properties=reset_xform_op_properties,
         )
+
         # setup subscriptions
-        self._subscription_to_timeline_stop_event = (
-            SimulationManager._timeline.get_timeline_event_stream().create_subscription_to_pop_by_type(
-                int(omni.timeline.TimelineEventType.STOP),
-                lambda event, obj=weakref.proxy(self): obj._on_timeline_stop(event),
-            )
+        def safe_timeline_stop_callback(event: Any, obj: Any = weakref.proxy(self)) -> None:
+            try:
+                obj._on_timeline_stop(event)
+            except ReferenceError:
+                # Object has been garbage collected, ignore the event
+                pass
+
+        self._subscription_to_timeline_stop_event = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.timeline.GLOBAL_EVENT_STOP,
+            on_event=safe_timeline_stop_callback,
+            observer_name="isaacsim.core.experimental.prims.DeformablePrim._on_timeline_stop",
         )
         # setup physics-related configuration if simulation is running
         if SimulationManager._physics_sim_view__warp is not None:
-            SimulationManager._physx_sim_interface.flush_changes()
+            SimulationManager._physics_sim_interface.flush_changes()
             self._on_physics_ready(None)
 
-    def __del__(self):
+    def __del__(self) -> None:
+        """Clean up resources when the object is destroyed."""
         super().__del__()
         self._subscription_to_timeline_stop_event = None
         if hasattr(self, "_physics_deformable_body_view"):
@@ -451,7 +467,8 @@ class DeformablePrim(XformPrim):
     def get_element_indices(
         self, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> tuple[wp.array, wp.array, wp.array]:
-        """Get the element (triangular faces for surface, tetrahedrons for volume) indices
+        """Get the element (triangular faces for surface, tetrahedrons for volume) indices.
+
         of the simulation, collision and rest meshes of the prims.
 
         Backends: :guilabel:`tensor`. |br|
@@ -1061,10 +1078,12 @@ class DeformablePrim(XformPrim):
         # - get material properties
         E = np.empty((0, 1))
         nu = np.empty((0, 1))
-        for material in self.get_applied_physics_materials():
-            if material is not None:
-                E = np.append(E, material.get_youngs_moduli().numpy(), axis=0)
-                nu = np.append(nu, material.get_poissons_ratios().numpy(), axis=0)
+        with backend_utils.use_backend("usd"):
+            applied_physics_materials = self.get_applied_physics_materials()
+        for physics_material in applied_physics_materials:
+            if physics_material is not None:
+                E = np.append(E, physics_material.get_youngs_moduli().numpy(), axis=0)
+                nu = np.append(nu, physics_material.get_poissons_ratios().numpy(), axis=0)
             else:
                 E = np.append(E, np.zeros((1, 1)), axis=0)
                 nu = np.append(nu, np.zeros((1, 1)), axis=0)
@@ -1115,7 +1134,15 @@ class DeformablePrim(XformPrim):
     """
 
     def _check_for_tensor_backend(self, backend: str, *, fallback_backend: str = "usd") -> str:
-        """Check if the tensor backend is valid."""
+        """Check if the tensor backend is valid.
+
+        Args:
+            backend: The backend to check.
+            fallback_backend: The backend to use if the tensor backend is not valid.
+
+        Returns:
+            The validated backend name.
+        """
         if backend == "tensor" and not self.is_physics_tensor_entity_valid():
             if backend_utils.is_backend_set():
                 if backend_utils.should_raise_on_fallback():
@@ -1261,8 +1288,12 @@ class DeformablePrim(XformPrim):
     Internal callbacks.
     """
 
-    def _on_physics_ready(self, event) -> None:
-        """Handle physics ready event."""
+    def _on_physics_ready(self, event: object) -> None:
+        """Handle physics ready event.
+
+        Args:
+            event: The physics ready event.
+        """
         super()._on_physics_ready(event)
         # get physics simulation view
         physics_simulation_view = SimulationManager._physics_sim_view__warp
@@ -1314,8 +1345,12 @@ class DeformablePrim(XformPrim):
         # precompute the rest pose inverse matrices for rotations
         self._precompute_rotations = True
 
-    def _on_timeline_stop(self, event) -> None:
-        """Handle timeline stop event."""
+    def _on_timeline_stop(self, event: object) -> None:
+        """Handle timeline stop event.
+
+        Args:
+            event: The timeline stop event.
+        """
         # invalidate deformable body view
         self._physics_deformable_body_view = None
 
@@ -1327,11 +1362,31 @@ Warp kernels
 
 @wp.func
 def _wf_get_matrix_column(m: wp.mat33, i: int) -> wp.vec3:
+    """Extract a column from a 3x3 matrix.
+
+    Args:
+        m: The 3x3 matrix to extract from.
+        i: Column index (0, 1, or 2).
+
+    Returns:
+        The specified column as a 3D vector.
+    """
     return wp.vec3(m[0][i], m[1][i], m[2][i])
 
 
 @wp.func
 def _wf_quaternion_from_axis_angle(angle_radians: float, axis: wp.vec3) -> wp.quat:
+    """Create a quaternion from an axis-angle representation.
+
+    Converts a rotation specified by an axis vector and angle into a quaternion.
+
+    Args:
+        angle_radians: Rotation angle in radians.
+        axis: The rotation axis as a normalized 3D vector.
+
+    Returns:
+        The resulting quaternion representing the rotation.
+    """
     half_angle = angle_radians * 0.5
     s = wp.sin(half_angle)
     w = wp.cos(half_angle)
@@ -1350,6 +1405,22 @@ def _wf_compute_deformation_gradient(
     body_index: int,
     tetrahedron_index: int,
 ) -> wp.mat33:
+    """Compute the deformation gradient for a tetrahedron element.
+
+    Calculates F = R^T * P * Q^-1 where R is the rotation matrix, P is the current
+    deformation matrix, and Q^-1 is the inverse rest pose matrix.
+
+    Args:
+        Q_inverse: Inverse rest pose matrix for the tetrahedron.
+        rotation: Current rotation as a quaternion.
+        indices: Element connectivity indices for all bodies and tetrahedra.
+        positions: Current nodal positions for all bodies.
+        body_index: Index of the deformable body.
+        tetrahedron_index: Index of the tetrahedron within the body.
+
+    Returns:
+        The computed deformation gradient matrix.
+    """
     R = wp.quat_to_matrix(rotation)
     P = _wf_compute_deformation_matrix(indices, positions, body_index, tetrahedron_index, False)
     F = P * Q_inverse
@@ -1364,11 +1435,26 @@ def _wf_compute_deformation_matrix(
     tetrahedron_index: int,
     inverse: bool,
 ) -> wp.mat33:
+    """Compute the deformation matrix for a tetrahedron element.
+
+    Constructs a 3x3 matrix from the displacement vectors of the tetrahedron vertices.
+    Optionally computes the inverse matrix for rest pose calculations.
+
+    Args:
+        indices: Element connectivity indices for all bodies and tetrahedra.
+        positions: Nodal positions for all bodies.
+        body_index: Index of the deformable body.
+        tetrahedron_index: Index of the tetrahedron within the body.
+        inverse: Whether to return the inverse matrix.
+
+    Returns:
+        The deformation matrix or its inverse if requested.
+    """
     tetrahedron_indices = indices[body_index][tetrahedron_index]
-    v0 = positions[body_index][tetrahedron_indices[0]]
-    v1 = positions[body_index][tetrahedron_indices[1]]
-    v2 = positions[body_index][tetrahedron_indices[2]]
-    v3 = positions[body_index][tetrahedron_indices[3]]
+    v0 = positions[body_index][wp.int32(tetrahedron_indices[0])]
+    v1 = positions[body_index][wp.int32(tetrahedron_indices[1])]
+    v2 = positions[body_index][wp.int32(tetrahedron_indices[2])]
+    v3 = positions[body_index][wp.int32(tetrahedron_indices[3])]
     # compute displacement field
     u1 = wp.vec3(v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2])
     u2 = wp.vec3(v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2])
@@ -1379,7 +1465,7 @@ def _wf_compute_deformation_matrix(
         det = wp.determinant(m)
         volume = det / 6.0
         if volume < 1e-9:
-            m = wp.mat33(wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0))
+            m = wp.matrix_from_rows(wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0))
         else:
             m = wp.inverse(m)
     return m
@@ -1387,6 +1473,20 @@ def _wf_compute_deformation_matrix(
 
 @wp.func
 def _wf_extract_rotation(A: wp.mat33, q: wp.quat, max_iterations: int, eps: float = 1e-6) -> wp.quat:
+    """Extract rotation from a deformation matrix using iterative algorithm.
+
+    Uses an iterative method to find the rotation component that best aligns with the
+    given deformation matrix, starting from an initial quaternion guess.
+
+    Args:
+        A: The deformation matrix to extract rotation from.
+        q: Initial quaternion guess for the rotation.
+        max_iterations: Maximum number of iterations to perform.
+        eps: Convergence tolerance for early termination.
+
+    Returns:
+        The extracted rotation as a normalized quaternion.
+    """
     for _ in range(max_iterations):
         # convert quaternion q to rotation matrix R
         R = wp.quat_to_matrix(q)
@@ -1416,7 +1516,7 @@ def _wf_extract_rotation(A: wp.mat33, q: wp.quat, max_iterations: int, eps: floa
     return q
 
 
-@wp.kernel
+@wp.kernel(enable_backward=False)
 def _wk_compute_deformable_rotation(
     simulation_indices: wp.array3d(dtype=wp.uint32),
     simulation_positions: wp.array3d(dtype=wp.float32),
@@ -1424,7 +1524,20 @@ def _wk_compute_deformable_rotation(
     rest_pose_inverse_matrices: wp.array2d(dtype=wp.mat33),
     simulation_rotations: wp.array3d(dtype=wp.float32),
     precompute: bool,
-):
+) -> None:
+    """Warp kernel to compute rotations for deformable tetrahedron elements.
+
+    Extracts rotation components from deformation gradients for each tetrahedron element.
+    Optionally precomputes rest pose inverse matrices on first call.
+
+    Args:
+        simulation_indices: Element connectivity indices for all bodies and tetrahedra.
+        simulation_positions: Current nodal positions for all bodies.
+        rest_positions: Rest pose nodal positions for all bodies.
+        rest_pose_inverse_matrices: Storage for precomputed inverse rest pose matrices.
+        simulation_rotations: Storage for computed rotations as quaternions.
+        precompute: Whether to precompute rest pose inverse matrices and initialize rotations.
+    """
     body_index, tetrahedron_index = wp.tid()
     if precompute:
         rest_pose_inverse_matrices[body_index][tetrahedron_index] = _wf_compute_deformation_matrix(
@@ -1449,14 +1562,26 @@ def _wk_compute_deformable_rotation(
     simulation_rotations[body_index][tetrahedron_index][3] = quaternion.w
 
 
-@wp.kernel
+@wp.kernel(enable_backward=False)
 def _wk_compute_deformable_gradient(
     simulation_indices: wp.array3d(dtype=wp.uint32),
     simulation_positions: wp.array3d(dtype=wp.float32),
     rest_pose_inverse_matrices: wp.array2d(dtype=wp.mat33),
     simulation_rotations: wp.array3d(dtype=wp.float32),
     simulation_gradients: wp.array2d(dtype=wp.mat33),
-):
+) -> None:
+    """Warp kernel to compute deformation gradients for all tetrahedron elements.
+
+    Processes each tetrahedron element across all deformable bodies to compute their
+    deformation gradients using current positions, rotations, and rest pose data.
+
+    Args:
+        simulation_indices: Element connectivity indices for all bodies and tetrahedra.
+        simulation_positions: Current nodal positions for all bodies.
+        rest_pose_inverse_matrices: Precomputed inverse rest pose matrices.
+        simulation_rotations: Current rotations for all tetrahedra as quaternions.
+        simulation_gradients: Output array for computed deformation gradients.
+    """
     body_index, tetrahedron_index = wp.tid()
     rest_pose = rest_pose_inverse_matrices[body_index][tetrahedron_index]
     tetrahedron_rotation = simulation_rotations[body_index][tetrahedron_index]
@@ -1467,7 +1592,7 @@ def _wk_compute_deformable_gradient(
     )
 
 
-@wp.kernel
+@wp.kernel(enable_backward=False)
 def _wk_compute_deformable_stress(
     simulation_indices: wp.array3d(dtype=wp.uint32),
     simulation_positions: wp.array3d(dtype=wp.float32),
@@ -1476,7 +1601,21 @@ def _wk_compute_deformable_stress(
     youngs_modulus: wp.array2d(dtype=wp.float32),
     poissons_ratio: wp.array2d(dtype=wp.float32),
     simulation_stresses: wp.array2d(dtype=wp.mat33),
-):
+) -> None:
+    """Warp kernel to compute stress tensors for deformable tetrahedron elements.
+
+    Calculates Cauchy stress tensors using linear elasticity theory based on deformation
+    gradients and material properties (Young's modulus and Poisson's ratio).
+
+    Args:
+        simulation_indices: Element connectivity indices for all bodies and tetrahedra.
+        simulation_positions: Current nodal positions for all bodies.
+        rest_pose_inverse_matrices: Precomputed inverse rest pose matrices.
+        simulation_rotations: Current rotations for all tetrahedra as quaternions.
+        youngs_modulus: Young's modulus values for each deformable body.
+        poissons_ratio: Poisson's ratio values for each deformable body.
+        simulation_stresses: Output array for computed stress tensors.
+    """
     body_index, tetrahedron_index = wp.tid()
     rest_pose = rest_pose_inverse_matrices[body_index][tetrahedron_index]
     tetrahedron_rotation = simulation_rotations[body_index][tetrahedron_index]

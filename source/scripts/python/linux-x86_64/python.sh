@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,21 +49,17 @@ done
 
 if ! [[ -z "${CONDA_PREFIX}" ]]; then
   echo "Warning: running in conda env, please deactivate before executing this script"
-  echo "If conda is desired please source setup_conda_env.sh in your python 3.11 conda env and run python normally"
 fi
 
-# Check if we are running in a docker container
-if [ -f /.dockerenv ]; then
-  # Check for vulkan in docker container
-  if [[ -f "${SCRIPT_DIR}/vulkan_check.sh" ]]; then
-    ${SCRIPT_DIR}/vulkan_check.sh
-  fi
+# Check for vulkan when running in a docker container
+if [ -f /.dockerenv ] && [[ -f "${SCRIPT_DIR}/vulkan_check.sh" ]]; then
+  ${SCRIPT_DIR}/vulkan_check.sh
 fi
 
 # Show icon if not running headless
 export RESOURCE_NAME="IsaacSim"
-# WAR for missing libcarb.so
-export LD_PRELOAD=$SCRIPT_DIR/kit/libcarb.so
+# WAR for missing libcarb.so, while preserving any caller-provided LD_PRELOAD
+export LD_PRELOAD=$SCRIPT_DIR/kit/libcarb.so${LD_PRELOAD:+:$LD_PRELOAD}
 
 # Run with lldb if --lldb-debug flag was specified, otherwise run normally
 if [[ "$use_lldb" == true ]]; then

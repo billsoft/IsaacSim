@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,14 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import pathlib
 
-import carb.settings
+"""Defines UI styling constants and functions for the robot setup assembler extension."""
+
 import omni
 import omni.kit.app
-import omni.ui as ui
-from omni.kit.window.extensions.common import get_icons_path
-from omni.ui import color as cl
 
 EXTENSION_FOLDER_PATH = omni.kit.app.get_app().get_extension_manager().get_extension_path_by_module(__name__)
 
@@ -47,7 +44,16 @@ TREEVIEW_HEADER_BG_COLOR = 0xFF2D2D2D
 WINDOW_BG_COLOR = 0xFF454545
 
 
-def get_style():
+def get_style() -> dict[str, dict[str, str | int]]:
+    """Returns the UI style dictionary for the robot setup assembler extension.
+
+    Provides styling configurations for various UI components including buttons, labels, images,
+    lines, and other visual elements used in the robot setup assembler interface.
+
+    Returns:
+        A dictionary mapping UI element selectors to their style properties such as colors,
+        font sizes, and image URLs.
+    """
     style = {
         "Button:disabled": {"background_color": BUTTON_DISABLED_BG_COLOR},
         "Button:hovered": {"background_color": BUTTON_DISABLED_BG_COLOR},

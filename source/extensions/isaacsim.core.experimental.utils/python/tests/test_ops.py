@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Verifies backend-neutral operation helpers for devices, placement, indexing, broadcasting, and cache reuse. Covers device parsing, indexed writes, index resolution, broadcast shape handling, and resolve-index cache behavior."""
+
+from __future__ import annotations
+
 import isaacsim.core.experimental.utils.ops as ops_utils
 import numpy as np
 import omni.kit.test
@@ -20,8 +24,10 @@ import warp as wp
 
 
 class TestOps(omni.kit.test.AsyncTestCase):
-    async def setUp(self):
-        """Method called to prepare the test fixture"""
+    """Test ops."""
+
+    async def setUp(self) -> None:
+        """Method called to prepare the test fixture."""
         super().setUp()
         # ---------------
         # Do custom setUp
@@ -40,8 +46,8 @@ class TestOps(omni.kit.test.AsyncTestCase):
         ]
         self.parametrize_dim = [1, 2, 3, 4]
 
-    async def tearDown(self):
-        """Method called immediately after the test method has been called"""
+    async def tearDown(self) -> None:
+        """Method called immediately after the test method has been called."""
         # ------------------
         # Do custom tearDown
         # ------------------
@@ -54,8 +60,16 @@ class TestOps(omni.kit.test.AsyncTestCase):
         a: wp.array | list[wp.array],
         shape: list[int] | None = None,
         dtype: type | None = None,
-        device: str | wp.context.Device | None = None,
-    ):
+        device: str | wp.Device | None = None,
+    ) -> None:
+        """Check array.
+
+        Args:
+            a: Warp array or arrays to check.
+            shape: Expected array shape.
+            dtype: Expected array dtype.
+            device: Expected Warp device.
+        """
         for i, x in enumerate(a if isinstance(a, (list, tuple)) else [a]):
             assert isinstance(x, wp.array), f"[{i}]: {repr(x)} ({type(x)}) is not a Warp array"
             if shape is not None:
@@ -71,7 +85,14 @@ class TestOps(omni.kit.test.AsyncTestCase):
         b: wp.array | np.ndarray | list[wp.array] | list[np.ndarray],
         *,
         given: list | None = None,
-    ):
+    ) -> None:
+        """Check equal.
+
+        Args:
+            a: First array or array list.
+            b: Second array or array list.
+            given: Optional Hypothesis input values to include in assertion messages.
+        """
         msg = ""
         a = a if isinstance(a, (list, tuple)) else [a]
         b = b if isinstance(b, (list, tuple)) else [b]
@@ -88,7 +109,32 @@ class TestOps(omni.kit.test.AsyncTestCase):
 
     # --------------------------------------------------------------------
 
-    async def test_place(self):
+    async def test_parse_device(self) -> None:
+        """Test parse device."""
+        for device in [None, "cpu", "cuda", "cuda:0", "cuda:10", "edge-case", wp.get_device()]:
+            # get target device
+            target_device = None
+            if device in [None, "edge-case"]:
+                target_device = wp.get_device()
+            elif isinstance(device, str) and device.startswith("cuda"):
+                try:
+                    index = int(f"{device}:0".split(":")[1])
+                    target_device = wp.get_device(f"cuda:{index}")
+                except Exception:
+                    target_device = wp.get_device()
+            if not target_device:
+                target_device = wp.get_device(device)
+            # check device
+            self.assertEqual(ops_utils.parse_device(device), target_device)
+            # check device with raise_on_invalid=True
+            if device in ["cuda:10", "edge-case"]:
+                with self.assertRaises(ValueError):
+                    ops_utils.parse_device(device, raise_on_invalid=True)
+            else:
+                ops_utils.parse_device(device, raise_on_invalid=True)
+
+    async def test_place(self) -> None:
+        """Test place."""
         for device in self.parametrize_device:
             for dtype in self.parametrize_dtype:
                 for dim in self.parametrize_dim:
@@ -120,7 +166,8 @@ class TestOps(omni.kit.test.AsyncTestCase):
                     output = ops_utils.place(x, dtype=dtype, device=device)
                     self.check_array(output, shape=shape, dtype=dtype, device=device)
 
-    async def test_resolve_indices(self):
+    async def test_resolve_indices(self) -> None:
+        """Test resolve indices."""
         for device in self.parametrize_device:
             for dtype in self.parametrize_dtype:
                 for dim in self.parametrize_dim:
@@ -152,7 +199,8 @@ class TestOps(omni.kit.test.AsyncTestCase):
                     output = ops_utils.resolve_indices(x, count=5, dtype=dtype, device=device)
                     self.check_array(output, shape=shape, dtype=dtype, device=device)
 
-    async def test_broadcast_to(self):
+    async def test_broadcast_to(self) -> None:
+        """Test broadcast to."""
         for device in self.parametrize_device:
             for dtype in self.parametrize_dtype:
                 for shape in [(5,), (11, 5), (22, 11, 5), (33, 22, 11, 5)]:
@@ -189,3 +237,16 @@ class TestOps(omni.kit.test.AsyncTestCase):
                         output = ops_utils.broadcast_to(wp.array(x), shape=shape, dtype=dtype, device=device)
                         self.check_array(output, shape=shape, dtype=dtype, device=device)
                         self.check_equal(broadcasted, output)
+
+    async def test_resolve_indices_cache(self) -> None:
+        """Test that resolve_indices caches arange arrays and reuses them across calls."""
+        for device in ["cpu", "cuda:0"]:
+            for count in [1, 5, 10]:
+                arr1 = ops_utils.resolve_indices(None, count=count, dtype=wp.int32, device=device)
+                arr2 = ops_utils.resolve_indices(None, count=count, dtype=wp.int32, device=device)
+                self.assertIs(
+                    arr1, arr2, f"resolve_indices must return the same cached array (count={count}, device={device})"
+                )
+                # Explicit indices must not return the cached arange object.
+                explicit = ops_utils.resolve_indices([0], count=count, dtype=wp.int32, device=device)
+                self.assertIsNot(explicit, arr1, "Explicit indices must not return the cached arange")

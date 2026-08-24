@@ -1,19 +1,40 @@
-API
-===
+Python API
+==========
 
 .. warning::
 
     **The API featured in this extension is experimental and subject to change without deprecation cycles.**
     Although we will try to maintain backward compatibility in the event of a change, it may not always be possible.
 
-Python API
-----------
-
 .. Summary
+
+The following table summarizes the available modules.
+
+.. currentmodule:: isaacsim.core.experimental.utils.impl
+
+.. autosummary::
+    :nosignatures:
+
+    app
+    backend
+    foundation
+    ops
+    prim
+    semantics
+    stage
+    transform
+    xform
 
 .. Details
 
 .. API
+
+App Utils
+^^^^^^^^^
+
+.. automodule:: isaacsim.core.experimental.utils.impl.app
+    :members:
+    :undoc-members:
 
 Backend Utils
 ^^^^^^^^^^^^^
@@ -43,6 +64,13 @@ Prim Utils
     :members:
     :undoc-members:
 
+Semantics Utils
+^^^^^^^^^^^^^^^
+
+.. automodule:: isaacsim.core.experimental.utils.impl.semantics
+    :members:
+    :undoc-members:
+
 Stage Utils
 ^^^^^^^^^^^
 
@@ -54,5 +82,12 @@ Transform Utils
 ^^^^^^^^^^^^^^^
 
 .. automodule:: isaacsim.core.experimental.utils.impl.transform
+    :members:
+    :undoc-members:
+
+Xform Utils
+^^^^^^^^^^^^^^^
+
+.. automodule:: isaacsim.core.experimental.utils.impl.xform
     :members:
     :undoc-members:

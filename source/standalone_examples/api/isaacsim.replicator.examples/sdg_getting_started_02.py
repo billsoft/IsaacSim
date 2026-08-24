@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Demonstrate SDG with custom writers and multiple render products."""
+
 import os
 
 from isaacsim import SimulationApp
@@ -22,14 +24,13 @@ simulation_app = SimulationApp(launch_config={"headless": False})
 import carb.settings
 import omni.replicator.core as rep
 import omni.usd
-from isaacsim.core.utils.semantics import add_labels
 from omni.replicator.core import Writer
-from pxr import Sdf, UsdGeom
 
 
-# Create a custom writer to access the annotator data
 class MyWriter(Writer):
-    def __init__(self, camera_params: bool = True, bounding_box_3d: bool = True):
+    """Access and print annotator data from attached render products."""
+
+    def __init__(self, camera_params: bool = True, bounding_box_3d: bool = True) -> None:
         # Organize data from render product perspective (legacy, annotator, renderProduct)
         self.data_structure = "renderProduct"
         self.annotators = []
@@ -39,16 +40,20 @@ class MyWriter(Writer):
             self.annotators.append(rep.annotators.get("bounding_box_3d"))
         self._frame_id = 0
 
-    def write(self, data):
-        print(f"[MyWriter][{self._frame_id}] data:{data}")
+    def write(self, data: dict) -> None:
+        """Print captured annotator data for each frame."""
+        print(f"[MyWriter][{self._frame_id}] data:")
+        for key, value in data.items():
+            print(f"  {key}: {value}")
         self._frame_id += 1
 
 
-# Register the writer for use
+# Register the writer
 rep.writers.register_writer(MyWriter)
 
 
-def run_example():
+def run_example() -> None:
+    """Run SDG with custom writer, pose writer, and annotator data access."""
     # Create a new stage and disable capture on play
     omni.usd.get_context().new_stage()
     rep.orchestrator.set_capture_on_play(False)
@@ -57,37 +62,36 @@ def run_example():
     carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
     # Setup stage
-    stage = omni.usd.get_context().get_stage()
-    dome_light = stage.DefinePrim("/World/DomeLight", "DomeLight")
-    dome_light.CreateAttribute("inputs:intensity", Sdf.ValueTypeNames.Float).Set(500.0)
-    cube = stage.DefinePrim("/World/Cube", "Cube")
-    add_labels(cube, labels=["MyCube"], instance_name="class")
+    rep.functional.create.xform(name="World")
+    rep.functional.create.dome_light(intensity=500, parent="/World", name="DomeLight")
+    cube = rep.functional.create.cube(parent="/World", name="Cube")
+    rep.functional.modify.semantics(cube, {"class": "my_cube"}, mode="add")
 
-    # Capture from two perspectives, a custom camera and the viewport perspective camera
-    camera = stage.DefinePrim("/World/Camera", "Camera")
-    UsdGeom.Xformable(camera).AddTranslateOp().Set((0, 0, 20))
+    # Capture from two perspectives, a custom camera and a perspective camera
+    top_cam = rep.functional.create.camera(position=(0, 0, 5), look_at=(0, 0, 0), parent="/World", name="TopCamera")
+    persp_cam = rep.functional.create.camera(position=(5, 5, 5), look_at=(0, 0, 0), parent="/World", name="PerspCamera")
 
     # Create the render products
-    rp_cam = rep.create.render_product(camera.GetPath(), (400, 400), name="camera_view")
-    rp_persp = rep.create.render_product("/OmniverseKit_Persp", (512, 512), name="perspective_view")
+    rp_top = rep.create.render_product(top_cam.GetPath(), (400, 400), name="top_view")
+    rp_persp = rep.create.render_product(persp_cam.GetPath(), (512, 512), name="persp_view")
 
     # Use the annotators to access the data directly, each annotator is attached to a render product
-    rgb_annotator_cam = rep.annotators.get("rgb")
-    rgb_annotator_cam.attach(rp_cam)
+    rgb_annotator_top = rep.annotators.get("rgb")
+    rgb_annotator_top.attach(rp_top)
     rgb_annotator_persp = rep.annotators.get("rgb")
     rgb_annotator_persp.attach(rp_persp)
 
     # Use the custom writer to access the annotator data
     custom_writer = rep.writers.get("MyWriter")
     custom_writer.initialize(camera_params=True, bounding_box_3d=True)
-    custom_writer.attach([rp_cam, rp_persp])
+    custom_writer.attach([rp_top, rp_persp])
 
     # Use the pose writer to write the data to disk
     pose_writer = rep.WriterRegistry.get("PoseWriter")
     out_dir = os.path.join(os.getcwd(), "_out_pose_writer")
     print(f"Output directory: {out_dir}")
     pose_writer.initialize(output_dir=out_dir, write_debug_images=True)
-    pose_writer.attach([rp_cam, rp_persp])
+    pose_writer.attach([rp_top, rp_persp])
 
     # Trigger a data capture request (data will be written to disk by the writer)
     for i in range(3):
@@ -95,23 +99,55 @@ def run_example():
         rep.orchestrator.step()
 
         # Get the data from the annotators
-        rgb_data_cam = rgb_annotator_cam.get_data()
+        rgb_data_top = rgb_annotator_top.get_data()
         rgb_data_persp = rgb_annotator_persp.get_data()
-        print(f"[Annotator][Cam][{i}] rgb_data_cam shape: {rgb_data_cam.shape}")
+        print(f"[Annotator][Top][{i}] rgb_data_top shape: {rgb_data_top.shape}")
         print(f"[Annotator][Persp][{i}] rgb_data_persp shape: {rgb_data_persp.shape}")
 
-    # Detach the render products from the annotators and writers and clear them to release resources
+    # Wait for the data to be written to disk and clean up resources
+    rep.orchestrator.wait_until_complete()
     pose_writer.detach()
     custom_writer.detach()
-    rgb_annotator_cam.detach()
+    rgb_annotator_top.detach()
     rgb_annotator_persp.detach()
-    rp_cam.destroy()
+    rp_top.destroy()
     rp_persp.destroy()
-
-    # Wait for the data to be written to disk
-    rep.orchestrator.wait_until_complete()
 
 
 run_example()
+
+# <start-sdg-getting-started-02-test>
+import argparse
+import sys
+
+from isaacsim.core.utils.extensions import enable_extension
+
+enable_extension("isaacsim.test.utils")
+from isaacsim.test.utils.file_validation import validate_folder_contents
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--test",
+    action="store_true",
+    help="Validate captured output files against expected counts and exit.",
+)
+args, _ = parser.parse_known_args()
+
+if args.test:
+    # PoseWriter with write_debug_images=True writes 1 json + 1 png + 1 _overlay.png per capture,
+    # plus a single metadata.txt for the run. 3 steps x 2 render products = 6 captures.
+    num_captures = 3 * 2
+    out_dir = os.path.join(os.getcwd(), "_out_pose_writer")
+    ok = validate_folder_contents(
+        path=out_dir,
+        recursive=True,
+        expected_counts={"json": num_captures, "png": num_captures * 2, "txt": 1},
+        fail_on_empty_files=True,
+    )
+    if not ok:
+        print(f"[SDG][Test][FAIL] Output validation failed for {out_dir}")
+        sys.exit(1)
+    print(f"[SDG][Test][PASS] Output validation succeeded for {out_dir}")
+# <end-sdg-getting-started-02-test>
 
 simulation_app.close()

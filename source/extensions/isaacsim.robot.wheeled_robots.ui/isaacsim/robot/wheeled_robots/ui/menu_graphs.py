@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,14 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Module containing menu helper windows for creating and managing wheeled robot control graphs."""
+
+from __future__ import annotations
+
 from pathlib import Path
 
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.prim as prim_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.graph.core as og
 import omni.ui as ui
 import omni.usd
 import OmniGraphSchema
-from isaacsim.core.utils.prims import get_all_matching_child_prims, get_prim_at_path
-from isaacsim.core.utils.stage import get_next_free_path
 from isaacsim.gui.components.callbacks import on_docs_link_clicked, on_open_IDE_clicked
 from isaacsim.gui.components.style import get_style
 from isaacsim.gui.components.widgets import ParamWidget, SelectPrimWidget
@@ -33,9 +38,9 @@ OG_DOCS_LINK = "https://docs.isaacsim.omniverse.nvidia.com/latest/omnigraph/omni
 
 
 class DifferentialControllerWindow(MenuHelperWindow):
-    """Window for creating differential controller graphs"""
+    """Window for creating differential controller graphs."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("Differential Controller", width=400, height=500)
         # Initialize parameters
         self._og_path = "/Graphs/differential_controller"
@@ -46,15 +51,15 @@ class DifferentialControllerWindow(MenuHelperWindow):
         self._wheel_distance = 0.0
         self._left_joint_name = ""
         self._right_joint_name = ""
-        self._left_joint_index = 0
-        self._right_joint_index = 0
+        self._left_joint_index = -1
+        self._right_joint_index = -1
         self._use_keyboard = False
 
         # Build UI
         self._build_ui()
 
-    def _build_ui(self):
-        """Build the window UI"""
+    def _build_ui(self) -> None:
+        """Build the window UI."""
         og_path_def = ParamWidget.FieldDef(
             name="og_path", label="graph path", type=ui.StringField, default=self._og_path
         )
@@ -79,13 +84,21 @@ class DifferentialControllerWindow(MenuHelperWindow):
             name="right_joint_name", label="Right Joint Name", type=ui.StringField, default=self._right_joint_name
         )
         left_joint_index_def = ParamWidget.FieldDef(
-            name="left_joint_index", label="Left Joint Index", type=ui.IntField, default=self._left_joint_index
+            name="left_joint_index",
+            label="Left Joint Index",
+            type=ui.IntField,
+            default=self._left_joint_index,
+            tooltip="0 or greater; leave -1 unset",
         )
         right_joint_index_def = ParamWidget.FieldDef(
-            name="right_joint_index", label="Right Joint Index", type=ui.IntField, default=self._right_joint_index
+            name="right_joint_index",
+            label="Right Joint Index",
+            type=ui.IntField,
+            default=self._right_joint_index,
+            tooltip="0 or greater; leave -1 unset",
         )
 
-        ## populate the popup window
+        # Populate the popup window
         with self.frame:
             with ui.VStack(spacing=4):
                 with ui.HStack(height=40):
@@ -106,12 +119,12 @@ class DifferentialControllerWindow(MenuHelperWindow):
                     style={"font_size": 18, "color": 0xFFA8A8A8},
                 )
                 with ui.VStack(spacing=4):
-                    self.right_joint_name_input = ParamWidget(field_def=right_joint_name_def)
                     self.left_joint_name_input = ParamWidget(field_def=left_joint_name_def)
+                    self.right_joint_name_input = ParamWidget(field_def=right_joint_name_def)
                 ui.Label("    OR", height=0)
                 with ui.VStack(spacing=4):
-                    self.right_joint_index_input = ParamWidget(field_def=right_joint_index_def)
                     self.left_joint_index_input = ParamWidget(field_def=left_joint_index_def)
+                    self.right_joint_index_input = ParamWidget(field_def=right_joint_index_def)
                 ui.Spacer(height=5)
                 with ui.HStack():
                     ui.Label("Use Keyboard Control (WASD)", width=ui.Percent(30))
@@ -144,29 +157,28 @@ class DifferentialControllerWindow(MenuHelperWindow):
                                 style=get_style()["IconButton.Image::OpenLink"],
                             )
 
-        return
+    def make_graph(self) -> None:
+        """Create and configure the differential controller OmniGraph with necessary nodes and connections.
 
-    def make_graph(self):
-        # stop the simulation before adding nodes
-        self._timeline = omni.timeline.get_timeline_interface()
-        self._timeline.stop()
+        Creates a new graph or adds to an existing one with differential controller, articulation controller,
+        and optional keyboard control nodes. Configures wheel parameters, joint mappings, and node connections
+        based on user input parameters.
+        """
+        app_utils.stop()
 
         keys = og.Controller.Keys
 
         # if starting from a new graph, start it with just a tick, the rest is the same for adding to exsiting graph
         if not self._add_to_existing_graph:
-            self._og_path = get_next_free_path(self._og_path, "")
+            self._og_path = stage_utils.generate_next_free_path(self._og_path, prepend_default_prim=False)
             graph_handle = og.Controller.create_graph({"graph_path": self._og_path, "evaluator_name": "execution"})
             og.Controller.create_node(self._og_path + "/OnPlaybackTick", "omni.graph.action.OnPlaybackTick")
         else:
             graph_handle = og.get_graph_by_path(self._og_path)
 
         # to an existin graph
-        # traverse through the graph
         all_nodes = graph_handle.get_nodes()
-        tick_node = None
-        diff_node = None
-        art_node = None
+        tick_node: str | None = None
         diff_node_name = "DifferentialController"
         art_node_name = "ArticulationController"
         for node in all_nodes:
@@ -175,15 +187,14 @@ class DifferentialControllerWindow(MenuHelperWindow):
             if node_type == "omni.graph.action.OnPlaybackTick" or node_type == "omni.graph.action.OnTick":
                 tick_node = node_path
             elif node_type == "isaacsim.robot.wheeled_robots.DifferentialController":
-                # if there already exist a differential controller, add a new one
-                diff_node = get_next_free_path(node_path, "")
-                diff_node_name = Path(diff_node).name
+                diff_node_name = Path(stage_utils.generate_next_free_path(node_path, prepend_default_prim=False)).name
             elif node_type == "isaacsim.core.nodes.IsaacArticulationController":
-                # if there already exist an articulation controller, add a new one
-                art_node = get_next_free_path(node_path, "")
-                art_node_name = Path(art_node).name
+                art_node_name = Path(stage_utils.generate_next_free_path(node_path, prepend_default_prim=False)).name
 
-        # rest of the nodes
+        if tick_node is None:
+            post_notification("No tick node found in graph", status=NotificationStatus.WARNING)
+            return
+
         og.Controller.edit(
             graph_handle,
             {
@@ -205,7 +216,7 @@ class DifferentialControllerWindow(MenuHelperWindow):
         )
 
         # if user input used joint indices
-        if self._left_joint_index and self._right_joint_index:
+        if self._left_joint_index >= 0 and self._right_joint_index >= 0:
             og.Controller.edit(
                 graph_handle,
                 {
@@ -215,8 +226,8 @@ class DifferentialControllerWindow(MenuHelperWindow):
                     ],
                     keys.SET_VALUES: [
                         ("ArrayNames.inputs:arrayType", "int[]"),
-                        ("ArrayNames.inputs:input0", self._right_joint_index),
-                        ("ArrayNames.inputs:input1", self._left_joint_index),
+                        ("ArrayNames.inputs:input0", self._left_joint_index),
+                        ("ArrayNames.inputs:input1", self._right_joint_index),
                         ("ArrayNames.inputs:arraySize", 2),
                     ],
                 },
@@ -237,8 +248,8 @@ class DifferentialControllerWindow(MenuHelperWindow):
                     ],
                     keys.SET_VALUES: [
                         ("ArrayNames.inputs:arrayType", "token[]"),
-                        ("ArrayNames.inputs:input0", self._right_joint_name),
-                        ("ArrayNames.inputs:input1", self._left_joint_name),
+                        ("ArrayNames.inputs:input0", self._left_joint_name),
+                        ("ArrayNames.inputs:input1", self._right_joint_name),
                         ("ArrayNames.inputs:arraySize", 2),
                     ],
                 },
@@ -314,15 +325,20 @@ class DifferentialControllerWindow(MenuHelperWindow):
                 og.Controller.attribute(self._og_path + "/" + diff_node_name + ".inputs:angularVelocity"),
             )
 
-    def _on_ok(self):
+    def _on_ok(self) -> None:
+        """Handle OK button click by validating parameters and creating the graph.
+
+        Collects values from UI inputs, validates parameters, and creates the differential controller
+        graph if validation passes. Hides the window on success or shows a warning notification on failure.
+        """
         self._og_path = self.og_path_input.get_value()
         self._robot_prim_path = self.robot_prim_input.get_value()
         self._wheel_radius = self.wheel_radius_input.get_value()
         self._wheel_distance = self.wheel_distance_input.get_value()
-        self._right_joint_name = self.right_joint_name_input.get_value()
         self._left_joint_name = self.left_joint_name_input.get_value()
-        self._right_joint_index = self.right_joint_index_input.get_value()
+        self._right_joint_name = self.right_joint_name_input.get_value()
         self._left_joint_index = self.left_joint_index_input.get_value()
+        self._right_joint_index = self.right_joint_index_input.get_value()
 
         param_check = self._check_params()
         if param_check:
@@ -331,10 +347,20 @@ class DifferentialControllerWindow(MenuHelperWindow):
         else:
             post_notification("Parameter check failed", status=NotificationStatus.WARNING)
 
-    def _on_cancel(self):
+    def _on_cancel(self) -> None:
+        """Handle Cancel button click by hiding the window without making changes."""
         self.visible = False
 
-    def _check_params(self):
+    def _check_params(self) -> bool:
+        """Validate the input parameters for creating the differential controller graph.
+
+        Checks if the existing graph path is valid when adding to existing graph, verifies that
+        exactly one articulation root prim exists under the specified robot prim, and updates
+        the articulation root path.
+
+        Returns:
+            True if all parameters are valid, False otherwise.
+        """
         stage = omni.usd.get_context().get_stage()
 
         if self._add_to_existing_graph:
@@ -347,9 +373,10 @@ class DifferentialControllerWindow(MenuHelperWindow):
                 post_notification(msg, status=NotificationStatus.WARNING)
                 return False
 
-        # from the robot parent prim, find the prim that contains the articulation root API
-        art_root_prim = get_all_matching_child_prims(
-            self._robot_prim_path, predicate=lambda path: get_prim_at_path(path).HasAPI(UsdPhysics.ArticulationRootAPI)
+        art_root_prim = prim_utils.get_all_matching_child_prims(
+            self._robot_prim_path,
+            predicate=lambda prim, path: prim.HasAPI(UsdPhysics.ArticulationRootAPI),
+            include_self=True,
         )
         if len(art_root_prim) == 0:
             msg = "No articulation root prim found under robot parent prim, check if you need to give a different prim for robot"
@@ -363,8 +390,18 @@ class DifferentialControllerWindow(MenuHelperWindow):
 
         return True
 
-    def _on_use_existing_graph(self, check_state):
+    def _on_use_existing_graph(self, check_state: bool) -> None:
+        """Handle checkbox state change for using existing graph option.
+
+        Args:
+            check_state: The new checkbox state indicating whether to add to existing graph.
+        """
         self._add_to_existing_graph = check_state
 
-    def _on_use_keyboard(self, check_state):
+    def _on_use_keyboard(self, check_state: bool) -> None:
+        """Handle checkbox state change for keyboard control option.
+
+        Args:
+            check_state: The new checkbox state indicating whether to enable WASD keyboard control.
+        """
         self._use_keyboard = check_state

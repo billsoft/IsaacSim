@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,15 +16,10 @@
 
 # Script to check ROS environment and source internal libraries if needed
 
-# Exit early if called by isaac-sim.selector.sh
-if [ ${#BASH_SOURCE[@]} -gt 1 ] && [ "$(basename "${BASH_SOURCE[1]}")" == "isaac-sim.selector.sh" ]; then
-    return 2>/dev/null || exit 0
-fi
-
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ISAAC_SIM_ROOT="$SCRIPT_DIR" 
 
-DEFAULT_ROS_DISTRO="humble"
+DEFAULT_ROS_DISTRO="jazzy"
 
 # Check Ubuntu version
 if [ -f /etc/os-release ]; then
@@ -43,8 +38,8 @@ if [ -z "$ROS_DISTRO" ]; then
     # Set ROS distro based on Ubuntu version
     export ROS_DISTRO="$DEFAULT_ROS_DISTRO"
     
-    # Path to the ROS2 bridge extension
-    BRIDGE_EXT_PATH="$ISAAC_SIM_ROOT/exts/isaacsim.ros2.bridge"
+    # Path to the ROS2 core extension
+    BRIDGE_EXT_PATH="$ISAAC_SIM_ROOT/exts/isaacsim.ros2.core"
 
     # Update LD_LIBRARY_PATH to include the extension libraries
     if [ -n "$LD_LIBRARY_PATH" ]; then
@@ -57,4 +52,4 @@ fi
 # Set RMW implementation to FastDDS if not already set
 if [ -z "$RMW_IMPLEMENTATION" ]; then
     export RMW_IMPLEMENTATION="rmw_fastrtps_cpp"
-fi 
+fi

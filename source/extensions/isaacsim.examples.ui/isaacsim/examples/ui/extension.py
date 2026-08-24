@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides comprehensive UI component examples and patterns for Isaac Sim extension development."""
+
 import gc
 import math
 import weakref
@@ -32,8 +35,32 @@ PRINT_DEBUG = True
 
 
 class Extension(omni.ext.IExt):
-    def on_startup(self, ext_id: str):
-        """Initialize extension and UI elements"""
+    """Demonstrates Isaac Sim's robotics-centric UI components and patterns for extension development.
+
+    Provides comprehensive examples of UI elements commonly used in robotics applications, including
+    checkboxes, buttons, sliders, plots, search interfaces, and custom controls. The extension serves as
+    a reference implementation for developers creating their own Isaac Sim extensions with graphical
+    user interfaces.
+
+    Features include:
+    - Interactive GUI grid with various input controls (buttons, checkboxes, dropdowns, sliders)
+    - Real-time plotting capabilities for time series and multi-axis data
+    - Search functionality with filterable lists
+    - File system navigation with folder picker
+    - Progress bars and communication status indicators
+    - Directional pad (D-pad) controllers for robot control
+    - Custom UI grouping and organization patterns
+
+    The extension creates a dockable window accessible through the "Window > Examples > GUI Templates"
+    menu, demonstrating best practices for UI layout, styling, and event handling in Isaac Sim extensions.
+    """
+
+    def on_startup(self, ext_id: str) -> None:
+        """Initialize extension and UI elements.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         self._ext_id = ext_id
         self._settings = carb.settings.get_settings()
 
@@ -44,6 +71,7 @@ class Extension(omni.ext.IExt):
 
         # Intialize the UI Window
         self._window = None
+        self._scrolling_frame = None
 
         # Keep a Reference to interactive GUI elements
         self._models = {}
@@ -76,11 +104,12 @@ class Extension(omni.ext.IExt):
 
         self.build_window()
 
-    def on_shutdown(self):
-        """Cleanup objects on extension shutdown"""
+    def on_shutdown(self) -> None:
+        """Cleanup objects on extension shutdown."""
         self._app_event_subscription = None
         remove_menu_items(self._menu_items, "Window")
         self._window = None
+        self._scrolling_frame = None
         self._app_event_sub = None
         self._search_bar.destroy()
         if self._folder_picker:
@@ -92,8 +121,8 @@ class Extension(omni.ext.IExt):
             dpad.shutdown()
         gc.collect()
 
-    def _menu_callback(self):
-        """Call the UI builder once selected from the drop down menu"""
+    def _menu_callback(self) -> None:
+        """Call the UI builder once selected from the drop down menu."""
         self.build_window()
 
         # Add Dpads on Top
@@ -101,8 +130,12 @@ class Extension(omni.ext.IExt):
         for i in range(4):
             self.dpads.append(Dpad(name=f"Dpad Controller {i}"))
 
-    def build_window(self):
+    def _on_visibility_changed(self, visible: bool) -> None:
+        if not visible:
+            self._app_event_sub = None
 
+    def build_window(self) -> None:
+        """Build the main UI window for the example extension."""
         # Add Dpads on Top
         self.dpads = []
         for i in range(4):
@@ -111,39 +144,47 @@ class Extension(omni.ext.IExt):
         """Builds the UI for EXTENSION_NAME"""
         if not self._window:
             self._window = ui.Window(
-                title=EXTENSION_NAME, width=700, height=0, visible=True, dockPreference=ui.DockPreference.LEFT_BOTTOM
+                title=EXTENSION_NAME,
+                width=700,
+                height=600,
+                visible=True,
+                dockPreference=ui.DockPreference.LEFT_BOTTOM,
             )
+            self._window.set_visibility_changed_fn(self._on_visibility_changed)
 
             with self._window.frame:
-                with ui.VStack(spacing=5, height=0):
+                self._scrolling_frame = ui.ScrollingFrame(
+                    horizontal_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_AS_NEEDED,
+                    vertical_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_ALWAYS_ON,
+                )
+                with self._scrolling_frame:
+                    with ui.VStack(spacing=5, height=0):
 
-                    title = "Isaac Sim Example UI"
-                    doc_link = "https://docs.isaacsim.omniverse.nvidia.com/latest/index.html"
+                        title = "Isaac Sim Example UI"
+                        doc_link = "https://docs.isaacsim.omniverse.nvidia.com/latest/index.html"
 
-                    overview = (
-                        "The Example UI shows how to use Isaac Sim's robotics-centric UI tools for your own extensions."
-                    )
-                    overview += "\n\nUse this as a reference or template when creating a UI for a new project."
-                    overview += "\n\nPress the 'Open in IDE' button to view the source code."
+                        overview = "The Example UI shows how to use Isaac Sim's robotics-centric UI tools for your own extensions."
+                        overview += "\n\nUse this as a reference or template when creating a UI for a new project."
+                        overview += "\n\nPress the 'Open in IDE' button to view the source code."
 
-                    setup_ui_headers(self._ext_id, __file__, title, doc_link, overview)
+                        setup_ui_headers(self._ext_id, __file__, title, doc_link, overview)
 
-                    self.build_example_gui_grid()
-                    self.build_plot_frame()
-                    self.build_search_frame()
-                    self.build_folder_picker_frame()
+                        self.build_example_gui_grid()
+                        self.build_plot_frame()
+                        self.build_search_frame()
+                        self.build_folder_picker_frame()
 
-                    self.build_comms_frame()
+                        self.build_comms_frame()
 
-                    self.build_progress_bar_frame()
+                        self.build_progress_bar_frame()
 
-                    # Shows how to Group UI elements
-                    self.build_custom_ui()
+                        # Shows how to Group UI elements
+                        self.build_custom_ui()
         else:
             self._window.visible = True
 
-    def build_example_gui_grid(self):
-
+    def build_example_gui_grid(self) -> None:
+        """Build the example GUI grid with various UI controls."""
         test_gui = {
             "Test_0": {
                 "label": "CB_0",
@@ -394,24 +435,23 @@ class Extension(omni.ext.IExt):
                 color_picker_builder()
                 ui.Spacer()
 
-    def toggle_app_step(self, val=None):
-        print("You've cliked time_series_plot_data:", val)
-        if val:
-            if not self._app_event_sub:
-                self._app_event_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
-                    event_name=omni.kit.app.GLOBAL_EVENT_UPDATE,
-                    on_event=self._on_app_step,
-                    observer_name="isaacsim.examples.ui.Extension._on_app_step",
-                )
-                # self._app_event_sub = (
-                #     omni.kit.app.get_app().get_update_event_stream().create_subscription_to_pop(self._on_app_step)
-                # )
-            else:
-                self._app_event_sub = None
+    def toggle_app_step(self, val: bool | None = None) -> None:
+        """Toggle the app step subscription for time series plot data.
+
+        Args:
+            val: Whether the subscription should be enabled.
+        """
+        print("You've clicked time_series_plot_data:", val)
+        if val and self._app_event_sub is None:
+            self._app_event_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=omni.kit.app.GLOBAL_EVENT_UPDATE,
+                on_event=self._on_app_step,
+                observer_name="isaacsim.examples.ui.Extension._on_app_step",
+            )
         else:
             self._app_event_sub = None
 
-    def _on_app_step(self, e: carb.events.IEvent):
+    def _on_app_step(self, e: carb.events.IEvent) -> None:
         self._tick += 1
         val = math.sin(math.radians(self._tick))
         self._models["timeseries_plot_val"].set_value(val)
@@ -420,24 +460,23 @@ class Extension(omni.ext.IExt):
             self._plot_data.pop(0)
         self._models["timeseries_plot"].set_data(*self._plot_data)
 
-    def toggle_app_step_1(self, val=None):
-        print("You've cliked time_series_plot_data:", val)
-        if val:
-            if not self._app_event_sub:
-                self._app_event_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
-                    event_name=omni.kit.app.GLOBAL_EVENT_UPDATE,
-                    on_event=self._on_app_step_1,
-                    observer_name="isaacsim.examples.ui.Extension._on_app_step_1",
-                )
-                # self._app_event_sub = (
-                #     omni.kit.app.get_app().get_update_event_stream().create_subscription_to_pop(self._on_app_step_1)
-                # )
-            else:
-                self._app_event_sub = None
+    def toggle_app_step_1(self, val: bool | None = None) -> None:
+        """Toggle the app step subscription for histogram plot data.
+
+        Args:
+            val: Whether the subscription should be enabled.
+        """
+        print("You've clicked time_series_plot_data:", val)
+        if val and self._app_event_sub is None:
+            self._app_event_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=omni.kit.app.GLOBAL_EVENT_UPDATE,
+                on_event=self._on_app_step_1,
+                observer_name="isaacsim.examples.ui.Extension._on_app_step_1",
+            )
         else:
             self._app_event_sub = None
 
-    def _on_app_step_1(self, e: carb.events.IEvent):
+    def _on_app_step_1(self, e: carb.events.IEvent) -> None:
         self._tick += 5
         val = math.sin(math.radians(self._tick))
         self._models["timeseries_plot_hist_val"].set_value(val)
@@ -446,21 +485,28 @@ class Extension(omni.ext.IExt):
             self._plot_data.pop(0)
         self._models["timeseries_plot_hist"].set_data(*self._plot_data)
 
-    def toggle_app_step_2(self, val=None):
-        print("You've cliked time_series_plot_data:", val)
-        if val:
-            if not self._app_event_sub:
-                self._app_event_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
-                    event_name=omni.kit.app.GLOBAL_EVENT_UPDATE,
-                    on_event=self._on_app_step_2,
-                    observer_name="isaacsim.examples.ui.Extension._on_app_step_2",
-                )
-            else:
-                self._app_event_sub = None
+    def toggle_app_step_2(self, val: bool | None = None) -> None:
+        """Toggle the app step subscription for XYZ plot data.
+
+        Args:
+            val: Whether the subscription should be enabled.
+        """
+        print("You've clicked time_series_plot_data:", val)
+        if val and self._app_event_sub is None:
+            self._app_event_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=omni.kit.app.GLOBAL_EVENT_UPDATE,
+                on_event=self._on_app_step_2,
+                observer_name="isaacsim.examples.ui.Extension._on_app_step_2",
+            )
         else:
             self._app_event_sub = None
 
-    def _on_app_step_2(self, e: carb.events.IEvent):
+    def _on_app_step_2(self, e: carb.events.IEvent) -> None:
+        """Updates XYZ plot data with new sine wave values.
+
+        Args:
+            e: The app step event.
+        """
         self._tick += 1
         for i in range(3):
             val = math.sin(math.radians(self._tick + i * 100))
@@ -470,7 +516,8 @@ class Extension(omni.ext.IExt):
             self._models["timeseries_plot_xyz"][i].set_data(*self._plot_data_xyz[i])
             self._models["timeseries_plot_xyz_vals"][i].set_value(val)
 
-    def build_plot_frame(self):
+    def build_plot_frame(self) -> None:
+        """Builds the plotting frame with static and time series plot examples."""
         self._plot_frame = ui.CollapsableFrame(
             title="Example: Plotting",
             height=0,
@@ -522,7 +569,8 @@ class Extension(omni.ext.IExt):
                     self._models["timeseries_plot_xyz_vals"],
                 ) = combo_cb_xyz_plot_builder(**kwargs)
 
-    def build_search_frame(self):
+    def build_search_frame(self) -> None:
+        """Builds the search frame with a searchable list widget."""
         self._search_frame = ui.CollapsableFrame(
             title="Example: Search",
             height=0,
@@ -547,7 +595,8 @@ class Extension(omni.ext.IExt):
             }
             self._search_bar, self._search_treeview = build_simple_search(**kwargs)
 
-    def build_folder_picker_frame(self):
+    def build_folder_picker_frame(self) -> None:
+        """Builds the folder picker frame with directory selection widget."""
         self._folder_picker_frame = ui.CollapsableFrame(
             title="Example: Folder Picker",
             height=0,
@@ -570,7 +619,12 @@ class Extension(omni.ext.IExt):
                 }
                 str_builder(**kwargs)
 
-    def handle_connect(self, val=False):
+    def handle_connect(self, val: bool = False) -> None:
+        """Handles connection state changes for communications.
+
+        Args:
+            val: Whether to connect or disconnect.
+        """
         if val:
             # do connect
             print("connecting")
@@ -578,7 +632,8 @@ class Extension(omni.ext.IExt):
             # do disconnect
             print("disconnecting")
 
-    def build_comms_frame(self):
+    def build_comms_frame(self) -> None:
+        """Builds the communications frame with hostname, port, and connection controls."""
         self._comms_frame = ui.CollapsableFrame(
             title="Example: Communications",
             height=0,
@@ -597,7 +652,8 @@ class Extension(omni.ext.IExt):
                     "", "button", "CONNECT", "DISCONNECT", "", self.handle_connect
                 )
 
-    def build_progress_bar_frame(self):
+    def build_progress_bar_frame(self) -> None:
+        """Builds the progress bar frame with a progress indicator and trigger button."""
         self._progress_bar_frame = ui.CollapsableFrame(
             title="Example: Progress Bar",
             height=0,
@@ -609,7 +665,7 @@ class Extension(omni.ext.IExt):
         )
         with self._progress_bar_frame:
 
-            def trigger_progress_bar():
+            def trigger_progress_bar() -> None:
                 model.set_value(model.get_value_as_float() + 0.03)
                 if model.get_value_as_float() > 1:
                     model.set_value(0)
@@ -619,10 +675,10 @@ class Extension(omni.ext.IExt):
                 kwargs = {"label": "", "text": "GO", "on_clicked_fn": trigger_progress_bar}
                 btn_builder(**kwargs)
 
-    def build_custom_ui(self):
-        """
-        This is where the User creates their main GUI.
-        Use a Group Frame to help visually differente user-generated vs core Isaac UI elements
+    def build_custom_ui(self) -> None:
+        """This is where the User creates their main GUI.
+
+        Use a Group Frame to help visually differente user-generated vs core Isaac UI elements.
         """
         self._my_ui = ui.CollapsableFrame(
             title="My Custom UI",
@@ -663,27 +719,50 @@ class Extension(omni.ext.IExt):
                     vertical_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_ALWAYS_ON,
                 )
 
-    def _on_dummy_callable_0(self, val=None, val2=None):
-        """Dummy Callable for testing the GUI"""
+    def _on_dummy_callable_0(self, val: object = None, val2: object = None) -> None:
+        """Dummy Callable for testing the GUI.
+
+        Args:
+            val: First test value.
+            val2: Second test value.
+        """
         if PRINT_DEBUG:
             print("You've cliked DUMMY CALLABLE 0:", val)
 
-    def _on_dummy_callable_1(self, val=None):
-        """Dummy Callable for testing the GUI"""
+    def _on_dummy_callable_1(self, val: object = None) -> None:
+        """Dummy Callable for testing the GUI.
+
+        Args:
+            val: Test value.
+        """
         if PRINT_DEBUG:
             print("You've cliked DUMMY CALLABLE 1:", val)
 
-    def _on_dummy_callable_2(self, val=None):
-        """Dummy Callable for testing the GUI"""
+    def _on_dummy_callable_2(self, val: object = None) -> None:
+        """Dummy Callable for testing the GUI.
+
+        Args:
+            val: Value passed from the GUI element callback.
+        """
         if PRINT_DEBUG:
             print("You've cliked DUMMY CALLABLE 2:", val)
 
-    def _on_dummy_callable_3(self, val=None):
-        """Dummy Callable for testing the GUI"""
+    def _on_dummy_callable_3(self, val: object = None) -> None:
+        """Dummy Callable for testing the GUI.
+
+        Args:
+            val: Value passed from the GUI element callback.
+        """
         if PRINT_DEBUG:
             print("You've cliked DUMMY CALLABLE 3. Item Selected: ", val)
 
-    def _on_dummy_callable_4(self, model, button, val=None):
-        """Dummy Callable for testing the GUI"""
+    def _on_dummy_callable_4(self, model: object, button: object, val: object = None) -> None:
+        """Dummy Callable for testing the GUI.
+
+        Args:
+            model: The model associated with the GUI element.
+            button: The button that was clicked.
+            val: Value passed from the GUI element callback.
+        """
         if PRINT_DEBUG:
             print("You've cliked DUMMY CALLABLE 4. Item Selected: ", val.text)

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,20 +13,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
+"""OmniGraph node implementation for OgnPose."""
 
+import json
+from typing import Any
+
+import isaacsim.core.experimental.utils.transform as transform_utils
 import numpy as np
 import omni.graph.core as og
-from isaacsim.core.utils.rotations import euler_angles_to_quat
-from isaacsim.core.utils.transformations import get_transform_with_normalized_rotation, tf_matrix_from_pose
-from isaacsim.replicator.writers.scripts.utils import get_image_space_points
+from isaacsim.replicator.writers.scripts.utils import (
+    get_image_space_points,
+    get_transform_with_normalized_rotation,
+    tf_matrix_from_pose,
+)
 
 
 class OgnPose:
     """OmniGraph node for a Pose annotator, allowing the poses of assets with semantic labels to be retrieved."""
 
     @staticmethod
-    def compute(db) -> bool:
+    def compute(db: Any) -> bool:
+        """Compute semantic pose data for the deprecated Pose OmniGraph annotator.
+
+        Build the semantic ID mapping, filter occluded prims when requested,
+        transform prim poses into the desired camera frame, and optionally
+        output image-space centers.
+
+        Args:
+            db: OmniGraph database object supplying semantic, camera, extent,
+                and output attributes.
+
+        Returns:
+            True when pose data or an empty output buffer is written, False when
+            no semantic types are requested.
+        """
+        db.log_warn("Deprecation warning: OgnPose has been deprecated and will be removed in the next major release.")
+
         include_occluded_prims = db.inputs.includeOccludedPrims
         get_centers = db.inputs.getCenters
 
@@ -106,7 +128,7 @@ class OgnPose:
                 self_labels = semantic_token_map[i * num_semantic_tokens : (i + 1) * num_semantic_tokens]
                 parent_labels = []
 
-                if i in id_to_parents.keys():
+                if i in id_to_parents:
                     for parent_semantic_id in id_to_parents[i]:
                         parent_labels.extend(
                             semantic_token_map[
@@ -160,7 +182,8 @@ class OgnPose:
         cameraProjection = db.inputs.cameraProjection
 
         default_camera_to_desired_camera = tf_matrix_from_pose(
-            translation=(0.0, 0.0, 0.0), orientation=euler_angles_to_quat(cameraRotation, degrees=True)
+            translation=(0.0, 0.0, 0.0),
+            orientation=transform_utils.euler_angles_to_quaternion(cameraRotation, degrees=True).numpy(),
         )
 
         world_to_default_camera_row_major = np.asarray(cameraViewTransform).reshape((4, 4))

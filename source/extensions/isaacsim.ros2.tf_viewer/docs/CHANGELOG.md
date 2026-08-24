@@ -1,4 +1,42 @@
 # Changelog
+
+## [2.3.3] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings, and update `python_api.md`.
+
+## [2.3.2] - 2026-05-14
+### Changed
+- Add missing type annotations across the UI builder, viewport scene, and transform listeners; replace bare `except` clauses, switch `set([...])` literals and `.format()` calls to modern equivalents, fix `!= None` comparisons, and import `Callable` from `collections.abc`
+
+## [2.3.1] - 2026-04-27
+### Removed
+- Remove the `omni.isaac.ml_archive` dependency
+
+## [2.3.0] - 2026-04-01
+### Changed
+- Added `isaacsim.core.experimental.utils` dependency
+- Migrated test utilities to use `stage_utils` from `isaacsim.core.experimental.utils`
+
+## [2.2.1] - 2026-03-26
+### Changed
+- Moved Python binding module to `bindings/` subdirectory
+
+## [2.2.0] - 2026-03-17
+### Changed
+- Updated documentation with AI agent.
+
+## [2.1.24] - 2025-11-10
+### Changed
+- Added CUDA build dependencies
+
+## [2.1.23] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [2.1.22] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [2.1.21] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 2.1.20)
@@ -77,7 +115,7 @@
 
 ## [2.1.2] - 2025-03-09
 ### Fixed
-- fix failing unit tests
+- Fix failing unit tests
 
 ## [2.1.1] - 2025-03-05
 ### Changed

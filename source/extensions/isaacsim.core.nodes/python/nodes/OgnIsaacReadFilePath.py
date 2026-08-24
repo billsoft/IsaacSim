@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,19 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from os.path import exists
+"""Read file contents from an OmniGraph path input into a string output."""
 
-import omni
+from os.path import exists
+from typing import Any
 
 
 class OgnIsaacReadFilePath:
-    """
-    look for file at path given, and return its contents
-    """
+    """look for file at path given, and return its contents."""
 
     @staticmethod
-    def compute(db) -> bool:
+    def compute(db: Any) -> bool:
+        """Populate `fileContents` from the input path, returning False for empty or missing paths.
 
+        Args:
+            db: OmniGraph database for this node.
+
+        Returns:
+            False when the input path is empty or missing.
+        """
         # Empty input:
         db.outputs.fileContents = ""
         if len(db.inputs.path) == 0:
@@ -35,5 +41,5 @@ class OgnIsaacReadFilePath:
             db.log_warn(f"Could not find file at {db.inputs.path}, returning empty string.")
             return False
         else:
-            with open(db.inputs.path, "r") as f:
+            with open(db.inputs.path) as f:
                 db.outputs.fileContents = f.read()

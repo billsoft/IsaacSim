@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,22 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Verifies the real-time-factor OmniGraph node reports simulation timing through the core nodes binding. Covers graph execution while the simulation advances."""
 
 import carb
+import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.graph.core as og
 import omni.graph.core.tests as ogts
 import omni.kit.test
-from isaacsim.core.api.robots import Robot
 from isaacsim.core.nodes.bindings import _isaacsim_core_nodes
-from isaacsim.core.utils.physics import simulate_async
-from isaacsim.core.utils.stage import open_stage_async
-from isaacsim.core.utils.viewports import get_viewport_names
 from isaacsim.storage.native import get_assets_root_path
 
 
 class TestRealTimeFactor(ogts.OmniGraphTestCase):
-    async def setUp(self):
-        """Set up  test environment, to be torn down when done"""
+    """Verify real-time-factor output through an OmniGraph test-node chain."""
+
+    async def setUp(self) -> None:
+        """Set up  test environment, to be torn down when done."""
         await omni.usd.get_context().new_stage_async()
         self._timeline = omni.timeline.get_timeline_interface()
         self._core_nodes = _isaacsim_core_nodes.acquire_interface()
@@ -38,21 +38,20 @@ class TestRealTimeFactor(ogts.OmniGraphTestCase):
         if assets_root_path is None:
             carb.log_error("Could not find Isaac Sim assets folder")
             return
-        (result, error) = await open_stage_async(
-            assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
-        )
+        await stage_utils.open_stage_async(assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd")
 
     # ----------------------------------------------------------------------
-    async def tearDown(self):
-        """Get rid of temporary data used by the test"""
+    async def tearDown(self) -> None:
+        """Get rid of temporary data used by the test."""
         await omni.kit.stage_templates.new_stage_async()
 
     # ----------------------------------------------------------------------
-    async def test_rtf(self):
+    async def test_rtf(self) -> None:
+        """Verify RTF becomes positive after the timeline advances."""
         graph_path = "/ActionGraph"
         nodeName = "isaac_test_node"
 
-        (test_graph, new_nodes, _, _) = og.Controller.edit(
+        test_graph, new_nodes, _, _ = og.Controller.edit(
             {"graph_path": graph_path, "evaluator_name": "execution"},
             {
                 og.Controller.Keys.CREATE_NODES: [

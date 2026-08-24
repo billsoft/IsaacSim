@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Literal
+"""Verifies RigidBodyMaterial properties across supported prim backends. Covers friction, restitution, density, combine modes, compliant contact enablement, and compliant contact gain accessors."""
+
+from typing import Any, Literal
 
 import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.kit.test
@@ -33,7 +35,14 @@ from isaacsim.core.experimental.prims.tests.common import (
 from pxr import UsdShade
 
 
-async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"], **kwargs) -> None:
+async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"], **kwargs: Any) -> None:
+    """Populate stage.
+
+    Args:
+        max_num_prims: Maximum number of material prims to pre-author.
+        operation: Prim setup operation requested by the parametrized test.
+        **kwargs: Additional populate-stage keyword arguments from the parametrized test.
+    """
     # create new stage
     stage = await stage_utils.create_new_stage_async()
     # define prims
@@ -43,22 +52,40 @@ async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"
 
 
 class TestRigidBodyMaterial(omni.kit.test.AsyncTestCase):
-    async def setUp(self):
-        """Method called to prepare the test fixture"""
+    """Test rigid body material."""
+
+    async def setUp(self) -> None:
+        """Method called to prepare the test fixture."""
         super().setUp()
 
-    async def tearDown(self):
-        """Method called immediately after the test method has been called"""
+    async def tearDown(self) -> None:
+        """Method called immediately after the test method has been called."""
         super().tearDown()
 
     # --------------------------------------------------------------------
 
     @parametrize(backends=["usd"], prim_class=RigidBodyMaterial, populate_stage_func=populate_stage)
-    async def test_len(self, prim, num_prims, device, backend):
+    async def test_len(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test len.
+
+        Args:
+            prim: Material wrapper under test.
+            num_prims: Number of material prims in the parametrized case.
+            device: Simulation device selected by the parametrized case.
+            backend: Prim backend selected by the parametrized case.
+        """
         self.assertEqual(len(prim), num_prims, f"Invalid len ({num_prims} prims)")
 
     @parametrize(backends=["usd"], prim_class=RigidBodyMaterial, populate_stage_func=populate_stage)
-    async def test_properties_and_getters(self, prim, num_prims, device, backend):
+    async def test_properties_and_getters(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test properties and getters.
+
+        Args:
+            prim: Material wrapper under test.
+            num_prims: Number of material prims in the parametrized case.
+            device: Simulation device selected by the parametrized case.
+            backend: Prim backend selected by the parametrized case.
+        """
         # test cases (properties)
         # - materials
         self.assertEqual(len(prim.materials), num_prims, f"Invalid materials len ({num_prims} prims)")
@@ -66,7 +93,15 @@ class TestRigidBodyMaterial(omni.kit.test.AsyncTestCase):
             self.assertTrue(usd_prim.IsValid() and usd_prim.IsA(UsdShade.Material), f"Invalid material")
 
     @parametrize(backends=["usd"], prim_class=RigidBodyMaterial, populate_stage_func=populate_stage)
-    async def test_friction_coefficients(self, prim, num_prims, device, backend):
+    async def test_friction_coefficients(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test friction coefficients.
+
+        Args:
+            prim: Material wrapper under test.
+            num_prims: Number of material prims in the parametrized case.
+            device: Simulation device selected by the parametrized case.
+            backend: Prim backend selected by the parametrized case.
+        """
         for indices, expected_count in draw_indices(count=num_prims, step=2):
             cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for (v0, expected_v0), (v1, expected_v1) in zip(
@@ -79,7 +114,15 @@ class TestRigidBodyMaterial(omni.kit.test.AsyncTestCase):
                 check_allclose((expected_v0, expected_v1), output, given=(v0, v1))
 
     @parametrize(backends=["usd"], prim_class=RigidBodyMaterial, populate_stage_func=populate_stage)
-    async def test_restitution_coefficients(self, prim, num_prims, device, backend):
+    async def test_restitution_coefficients(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test restitution coefficients.
+
+        Args:
+            prim: Material wrapper under test.
+            num_prims: Number of material prims in the parametrized case.
+            device: Simulation device selected by the parametrized case.
+            backend: Prim backend selected by the parametrized case.
+        """
         for indices, expected_count in draw_indices(count=num_prims, step=2):
             cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_sample(shape=(expected_count, 1), dtype=wp.float32):
@@ -89,7 +132,15 @@ class TestRigidBodyMaterial(omni.kit.test.AsyncTestCase):
                 check_allclose(expected_v0, output, given=(v0,))
 
     @parametrize(backends=["usd"], prim_class=RigidBodyMaterial, populate_stage_func=populate_stage)
-    async def test_densities(self, prim, num_prims, device, backend):
+    async def test_densities(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test densities.
+
+        Args:
+            prim: Material wrapper under test.
+            num_prims: Number of material prims in the parametrized case.
+            device: Simulation device selected by the parametrized case.
+            backend: Prim backend selected by the parametrized case.
+        """
         for indices, expected_count in draw_indices(count=num_prims, step=2):
             cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_sample(shape=(expected_count, 1), dtype=wp.float32):
@@ -99,7 +150,15 @@ class TestRigidBodyMaterial(omni.kit.test.AsyncTestCase):
                 check_allclose(expected_v0, output, given=(v0,))
 
     @parametrize(backends=["usd"], prim_class=RigidBodyMaterial, populate_stage_func=populate_stage)
-    async def test_combine_modes(self, prim, num_prims, device, backend):
+    async def test_combine_modes(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test combine modes.
+
+        Args:
+            prim: Material wrapper under test.
+            num_prims: Number of material prims in the parametrized case.
+            device: Simulation device selected by the parametrized case.
+            backend: Prim backend selected by the parametrized case.
+        """
         choices = ["average", "max", "min", "multiply"]
         for indices, expected_count in draw_indices(count=num_prims, step=2):
             cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
@@ -115,7 +174,15 @@ class TestRigidBodyMaterial(omni.kit.test.AsyncTestCase):
                 check_lists(expected_v2, output[2])
 
     @parametrize(backends=["usd"], prim_class=RigidBodyMaterial, populate_stage_func=populate_stage)
-    async def test_enabled_compliant_contacts(self, prim, num_prims, device, backend):
+    async def test_enabled_compliant_contacts(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test enabled compliant contacts.
+
+        Args:
+            prim: Material wrapper under test.
+            num_prims: Number of material prims in the parametrized case.
+            device: Simulation device selected by the parametrized case.
+            backend: Prim backend selected by the parametrized case.
+        """
         prim.set_compliant_contact_gains(stiffnesses=[100.0])  # set stiffnesses > 0 before testing
         for indices, expected_count in draw_indices(count=num_prims, step=2):
             cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
@@ -126,7 +193,15 @@ class TestRigidBodyMaterial(omni.kit.test.AsyncTestCase):
                 check_allclose(expected_v0, output, given=(v0,))
 
     @parametrize(backends=["usd"], prim_class=RigidBodyMaterial, populate_stage_func=populate_stage)
-    async def test_compliant_contact_gains(self, prim, num_prims, device, backend):
+    async def test_compliant_contact_gains(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test compliant contact gains.
+
+        Args:
+            prim: Material wrapper under test.
+            num_prims: Number of material prims in the parametrized case.
+            device: Simulation device selected by the parametrized case.
+            backend: Prim backend selected by the parametrized case.
+        """
         for indices, expected_count in draw_indices(count=num_prims, step=2):
             cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for (v0, expected_v0), (v1, expected_v1) in zip(

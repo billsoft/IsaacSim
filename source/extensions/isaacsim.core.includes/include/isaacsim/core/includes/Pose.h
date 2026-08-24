@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +12,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 #pragma once
 
 #include "Conversions.h"
@@ -26,6 +27,7 @@
 #else
 #    pragma GCC diagnostic push
 #    pragma GCC diagnostic ignored "-Wunused-variable"
+#    pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #    include <usdrt/scenegraph/usd/rt/xformable.h>
 #    pragma GCC diagnostic pop
 #endif
@@ -145,7 +147,7 @@ static usdrt::GfMatrix4d computeWorldXformNoCache(pxr::UsdStageRefPtr usdStage,
             {
                 // Regardless of when `fabricHierarchy->updateWorldXforms();` was last called, `getWorldXform()` will
                 // calculate the correct value using the omni:fabric:localMatrix values of the prim and its ancestors.
-                return fabricHierarchy->getWorldXform(omni::fabric::asInt(path));
+                return fabricHierarchy->getWorldXform(omni::fabric::Path::createImmortal(path.GetAsString().c_str()));
             }
         }
     }

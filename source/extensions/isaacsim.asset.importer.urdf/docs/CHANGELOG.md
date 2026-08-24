@@ -1,4 +1,127 @@
 # Changelog
+
+## [3.11.2] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings, and update `python_api.md`.
+
+## [3.11.1] - 2026-05-22
+### Changed
+- Update urdf-usd-converter to v0.1.3
+
+## [3.11.0] - 2026-05-14
+### Added
+- `URDFImporterConfig.fix_base` is now a tri-state `bool | None`. `True` adds a world-to-root fixed joint (existing behavior), `False` removes any existing world-to-root fixed joint so the robot becomes floating-base, and the new default `None` leaves the source asset's base authoring untouched.
+
+### Changed
+- `URDFImporter.import_urdf()` has tighter checks for urdf file names
+- Only adds Mass API when the user sets a non-default density to the links, otherwise links with no mass will not have a massAPI
+
+## [3.10.0] - 2026-05-07
+### Changed
+- Imported URDF mimic joints are now expressed exclusively through `NewtonMimicAPI` (via `newton:mimicJoint`, `newton:mimicCoef0`, `newton:mimicCoef1`). The transformer-driven authoring of the equivalent `PhysxMimicJointAPI` has been removed; the runtime consumes the Newton mimic schema directly.
+- Imported URDF articulation roots no longer carry `PhysxArticulationAPI`. Self-collision is authored via `NewtonArticulationRootAPI` (`newton:selfCollisionEnabled`) on top of the standard `UsdPhysics.ArticulationRootAPI`.
+
+## [3.9.1] - 2026-04-23
+### Changed
+- Update urdf-usd-converter to v0.1.2
+
+## [3.9.0] - 2026-04-20
+### Changed
+- `URDFImporter.import_urdf()` now writes all intermediate artifacts (merged-joints URDF, usdex layers, temp stage) to a system temp directory via `tempfile.mkdtemp()` in non-debug mode, instead of the source URDF directory. This avoids `PermissionError` when importing URDFs from read-only locations (packman cache, mounted volumes, installed extension data). In `debug_mode`, intermediates are still written next to the final USD output for inspection.
+- When the merged URDF is relocated to a temp directory, any relative `<mesh filename="..."/>` entries are rewritten to absolute paths so downstream mesh resolution is preserved. `package://` URIs and already-absolute paths are left untouched.
+- Intermediate-artifact cleanup is now wrapped in a `try/finally` so the scratch directory is removed even if an exception is raised mid-conversion.
+
+### Fixed
+- With `run_asset_transformer=False`, `import_urdf()` no longer crashes trying to write to a non-existent output directory. The intermediate stage is now only materialized when the transformer needs it, and the final USD is written directly to the output directory (which is created via `os.makedirs(..., exist_ok=True)`).
+
+## [3.8.0] - 2026-04-15
+- Added utilities for merging fixed joints
+- Added configs to set default joint dynamics, density, and fix robot
+- Added configs to run asset transformer, multi-physics conversion
+- Added robot name into the debug folder path to avoid duplication
+
+## [3.7.0] - 2026-04-14
+### Changed
+- Replace `pxr.PhysxSchema` typed-API usage with direct `prim.ApplyAPI()` / `prim.CreateAttribute()` calls in drive reconstruction module
+
+## [3.6.0] - 2026-04-14
+### Changed
+- Replace Kit extension manager lookup for default profile path with `isaacsim.asset.transformer.rules.DEFAULT_PROFILE_PATH`
+- Remove unused `import omni` and `self._extension_path` from extension entrypoint
+- Gate `extension.py` import in `__init__.py` so the package can be imported outside Kit
+
+## [3.5.0] - 2026-04-09
+### Added
+- Round-trip geometry reconstruction: capsule and cone primitives exported as URDF-compatible geometry are restored to their original USD types on import using `isaac:source_geometry` breadcrumb comments
+- Round-trip joint reconstruction: multi-DOF joints (SphericalJoint, D6Joint) decomposed into single-DOF URDF chains are collapsed back into their original USD joint types on import using `isaac:source_joint` breadcrumb comments
+- Round-trip drive reconstruction: DriveAPI gains, MjcActuator parameters, and PhysxJointAPI armature are restored from `isaac:source_drive` breadcrumb comments after the default URDF-to-PhysX/MjcActuator conversion
+
+### Changed
+- Refactored tests to write output to a temporary directory instead of the source tree, with centralized cleanup in tearDown
+
+## [3.4.0] - 2026-04-08
+### Changed
+- Improve Python API documentation (`config/python_api.md` and/or module docstrings).
+
+## [3.3.0] - 2026-03-31
+### Changed
+- Use shared ui library from isaacsim.gui.components
+- Version bump to urdf-usd-converter 0.1.1
+
+## [3.2.2] - 2026-03-21
+### Fixed
+- Fixed test teardown to stop the timeline and flush run-loop frames before the next stage is created, preventing a SIGSEGV crash in `UsdStage::~UsdStage`
+
+## [3.2.1] - 2026-03-09
+### Changed
+- Update urdf-usd-converter to v0.1.0
+
+## [3.2.0] - 2026-03-04
+### Changed
+- Urdf converter version bump to v0.1.0rc2
+
+## [3.1.0] - 2026-02-26
+### Changed
+- Added mjc / newton to physx attribute conversion for multi-physics engine asset support
+
+## [3.0.0] - 2026-02-01
+### Changed
+- USD exchange based backend
+- Unified UI
+- Asset structure 3
+
+## [2.5.0] - 2026-01-10
+### Removed
+- Removed UI elements from the URDF importer, moved to isaacsim.asset.importer.urdf.ui extension
+
+## [2.4.37] - 2026-01-05
+### Fixed
+- Updated configuring of mimic joints to be processed after all joints are created to avoid issues with lexicographical order of siblings
+
+## [2.4.36] - 2025-12-07
+### Changed
+- Update description
+
+## [2.4.35] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [2.4.34] - 2025-11-27
+### Changed
+- Add missing docstrings
+
+## [2.4.33] - 2025-11-26
+### Fixed
+- Fixed issue that caused crash of Isaac sim on failed mesh conversion
+
+## [2.4.32] - 2025-11-25
+### Changed
+- Restore deprecated behavior of merging bodies with inertia; issue warning
+
+## [2.4.31] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
 ## [2.4.30] - 2025-09-26
 ### Changed
 - Update license headers
@@ -145,7 +268,7 @@
 
 ## [2.3.10] - 2025-01-13
 ### Changed
-- refactor UI imports to use isaacsim.gui.components
+- Refactor UI imports to use isaacsim.gui.components
 
 ## [2.3.9] - 2025-01-09
 ### Changed
@@ -231,7 +354,7 @@
 
 ## [2.0.0] - 2024-09-26
 ### Added
-- automatic config of Joints Drive gains by Natural Frequency.
+- Automatic config of Joints Drive gains by Natural Frequency.
 
 ## [1.18.0] - 2024-09-25
 ### Changed
@@ -326,7 +449,7 @@
 
 ## [1.6.1] - 2023-12-14
 ### Fixed
-- output USD was accumulating disk size every time it was overwritten
+- Output USD was accumulating disk size every time it was overwritten
 - Instanceable importing was causing the importer to segfault when overwriting.
 
 ## [1.6.0] - 2023-12-11
@@ -422,8 +545,8 @@
 
 ## [0.5.8] - 2023-02-22
 ### Fixed
-- removed max joint effort scaling by 60 during import
-- removed custom collision api when the shape is a cylinder
+- Removed max joint effort scaling by 60 during import
+- Removed custom collision api when the shape is a cylinder
 
 ## [0.5.7] - 2023-02-17
 ### Added
@@ -517,9 +640,9 @@
 
 ## [0.1.10] - 2021-11-04
 ### Changed
-- create physics scene is false for import config
-- create physics scene will not create a scene if one exists
-- set default prim is false for import config
+- Create physics scene is false for import config
+- Create physics scene will not create a scene if one exists
+- Set default prim is false for import config
 
 ## [0.1.9] - 2021-10-25
 ### Added
@@ -531,7 +654,7 @@
 - rootJoint prim is renamed to root_joint for consistency with other joint names.
 
 ### Fixed
-- warnings when setting attributes as double when they should have been float
+- Warnings when setting attributes as double when they should have been float
 
 ## [0.1.8] - 2021-10-18
 ### Added

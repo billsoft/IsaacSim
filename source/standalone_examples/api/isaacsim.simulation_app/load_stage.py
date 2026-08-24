@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,19 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Demonstrate loading a USD stage in simulation."""
+
 import argparse
 import sys
 
 from isaacsim import SimulationApp
 
 # This sample loads a usd stage and starts simulation
-CONFIG = {"width": 1280, "height": 720, "sync_loads": True, "headless": False, "renderer": "RaytracedLighting"}
+CONFIG = {"width": 1280, "height": 720, "sync_loads": True, "headless": False, "renderer": "RealTimePathTracing"}
 
 
 # Set up command line arguments
 parser = argparse.ArgumentParser("Usd Load sample")
 parser.add_argument(
-    "--usd_path", type=str, help="Path to usd file, should be relative to your default assets folder", required=True
+    "--usd_path",
+    type=str,
+    help="Path to usd file. Either a full URL (http://, https://, omniverse://) used directly, "
+    "or a path relative to your default assets folder",
+    required=True,
 )
 parser.add_argument("--headless", default=False, action="store_true", help="Run stage headless")
 parser.add_argument("--test", default=False, action="store_true", help="Run in test mode")
@@ -41,25 +47,28 @@ import omni
 # Locate Isaac Sim assets folder to load sample
 from isaacsim.storage.native import get_assets_root_path, is_file
 
-assets_root_path = get_assets_root_path()
-if assets_root_path is None:
-    carb.log_error("Could not find Isaac Sim assets folder")
-    kit.close()
-    sys.exit()
-usd_path = assets_root_path + args.usd_path
+# If a full URL is provided, use it directly. Otherwise treat it as a path
+# relative to the default Isaac Sim assets folder.
+if args.usd_path.startswith(("http://", "https://", "omniverse://")):
+    usd_path = args.usd_path
+else:
+    assets_root_path = get_assets_root_path()
+    if assets_root_path is None:
+        carb.log_error("Could not find Isaac Sim assets folder")
+        kit.close()
+        sys.exit()
+    usd_path = assets_root_path + args.usd_path
 
 # make sure the file exists before we try to open it
 try:
     result = is_file(usd_path)
-except:
+except BaseException:
     result = False
 
 if result:
     omni.usd.get_context().open_stage(usd_path)
 else:
-    carb.log_error(
-        f"the usd path {usd_path} could not be opened, please make sure that {args.usd_path} is a valid usd file in {assets_root_path}"
-    )
+    carb.log_error(f"the usd path {usd_path} could not be opened, please make sure that it is a valid usd file")
     kit.close()
     sys.exit()
 # Wait two frames so that stage starts loading
@@ -67,7 +76,7 @@ kit.update()
 kit.update()
 
 print("Loading stage...")
-from isaacsim.core.utils.stage import is_stage_loading
+from isaacsim.core.experimental.utils.stage import is_stage_loading
 
 while is_stage_loading():
     kit.update()

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,23 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Verifies the TimeSplitter OmniGraph node decomposes time values into component outputs. Covers graph execution and output propagation for split time fields."""
+
 import omni.graph.core as og
 import omni.graph.core.tests as ogts
 import omni.kit.test
 
 
 class TestTimeSplitter(ogts.OmniGraphTestCase):
-    async def setUp(self):
-        """Set up  test environment, to be torn down when done"""
+    """Verify TimeSplitter output fields for several numeric input types."""
+
+    async def setUp(self) -> None:
+        """Set up  test environment, to be torn down when done."""
         await omni.usd.get_context().new_stage_async()
 
     # ----------------------------------------------------------------------
-    async def tearDown(self):
-        """Get rid of temporary data used by the test"""
+    async def tearDown(self) -> None:
+        """Get rid of temporary data used by the test."""
         # await omni.kit.stage_templates.new_stage_async()
 
     # ----------------------------------------------------------------------
-    async def test_time_splitter(self):
+    async def test_time_splitter(self) -> None:
+        """Verify seconds, milliseconds, microseconds, and nanoseconds are split from time inputs."""
         constant_tuples = [
             ("omni.graph.nodes.ConstantDouble", 1.012345678, (1, 12, 12345, 12345678)),
             ("omni.graph.nodes.ConstantFloat", 2.910123456, (2, 910, 910123, 910123348)),  # precision lost (ns)
@@ -47,7 +52,7 @@ class TestTimeSplitter(ogts.OmniGraphTestCase):
                 graph_count = graph_count + 1
                 controller = og.Controller()
                 keys = controller.Keys
-                (graph, (const, time_splitter), _, _) = controller.edit(
+                graph, (const, time_splitter), _, _ = controller.edit(
                     f"/World/Graph{graph_count}",
                     {
                         keys.CREATE_NODES: [

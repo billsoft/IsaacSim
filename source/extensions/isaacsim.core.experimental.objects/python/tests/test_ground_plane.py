@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Literal
+"""Validate GroundPlane creation, wrapping, and authored physics metadata.
+
+The suite covers stage-authored ground planes from both PhysX helper paths,
+GroundPlane create-versus-wrap behavior, collision enablement, contact offsets,
+torsional patch radii, physics material binding, and visual template
+application for the plane and mesh-backed child wrappers.
+"""
+
+from typing import Any, Literal
 
 import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
@@ -35,7 +43,14 @@ from omni.physx.scripts import physicsUtils
 from pxr import PhysicsSchemaTools, UsdGeom
 
 
-async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"], **kwargs) -> None:
+async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"], **kwargs: Any) -> None:
+    """Create a fresh stage and author existing ground planes for wrap-mode tests.
+
+    Args:
+        max_num_prims: Maximum number of prims to prepare on the stage.
+        operation: Operation mode selected by parametrization.
+        **kwargs: Additional arguments supplied by parametrization.
+    """
     # create new stage
     stage = await stage_utils.create_new_stage_async()
     # define prims
@@ -48,22 +63,49 @@ async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"
 
 
 class TestGroundPlane(omni.kit.test.AsyncTestCase):
-    async def setUp(self):
-        """Method called to prepare the test fixture"""
+    """Exercise GroundPlane wrapper construction and physics-facing attributes."""
+
+    async def setUp(self) -> None:
+        """Initialize the async fixture; parametrized cases create their own stages."""
         super().setUp()
 
-    async def tearDown(self):
-        """Method called immediately after the test method has been called"""
+    async def tearDown(self) -> None:
+        """Finalize the async fixture without additional ground-plane cleanup."""
         super().tearDown()
 
     # --------------------------------------------------------------------
 
+    async def test_instances(self) -> None:
+        """Test instances."""
+        await stage_utils.create_new_stage_async()
+        path = "/World/ground_plane"
+        ground_plane = GroundPlane(path)  # create
+        self.assertEqual(len(ground_plane.prims[0].GetChildren()), 3, "Invalid number of child prims")
+        ground_plane = GroundPlane(path)  # wrap
+        self.assertEqual(len(ground_plane.prims[0].GetChildren()), 3, "Invalid number of child prims")
+
     @parametrize(backends=["usd"], prim_class=GroundPlane, populate_stage_func=populate_stage)
-    async def test_len(self, prim, num_prims, device, backend):
+    async def test_len(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test len.
+
+        Args:
+            prim: Object wrapper collection under test.
+            num_prims: Number of prims in the parametrized collection.
+            device: Device expected for returned arrays.
+            backend: Backend name selected by parametrization.
+        """
         self.assertEqual(len(prim), num_prims, f"Invalid len ({num_prims} prims)")
 
     @parametrize(backends=["usd"], prim_class=GroundPlane, populate_stage_func=populate_stage)
-    async def test_properties_and_getters(self, prim, num_prims, device, backend):
+    async def test_properties_and_getters(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test properties and getters.
+
+        Args:
+            prim: Object wrapper collection under test.
+            num_prims: Number of prims in the parametrized collection.
+            device: Device expected for returned arrays.
+            backend: Backend name selected by parametrization.
+        """
         # test cases (properties)
         # - geoms
         self.assertEqual(len(prim._geoms), num_prims, f"Invalid geoms len ({num_prims} prims)")
@@ -79,7 +121,15 @@ class TestGroundPlane(omni.kit.test.AsyncTestCase):
         self.assertEqual(len(prim.meshes), num_prims, f"Invalid meshes len ({num_prims} prims)")
 
     @parametrize(backends=["usd"], prim_class=GroundPlane, populate_stage_func=populate_stage)
-    async def test_enabled_collisions(self, prim, num_prims, device, backend):
+    async def test_enabled_collisions(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test enabled collisions.
+
+        Args:
+            prim: Object wrapper collection under test.
+            num_prims: Number of prims in the parametrized collection.
+            device: Device expected for returned arrays.
+            backend: Backend name selected by parametrization.
+        """
         for indices, expected_count in draw_indices(count=num_prims, step=2):
             cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_sample(shape=(expected_count, 1), dtype=wp.bool):
@@ -89,7 +139,15 @@ class TestGroundPlane(omni.kit.test.AsyncTestCase):
                 check_allclose(expected_v0, output, given=(v0,))
 
     @parametrize(backends=["usd"], prim_class=GroundPlane, populate_stage_func=populate_stage)
-    async def test_offsets(self, prim, num_prims, device, backend):
+    async def test_offsets(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test offsets.
+
+        Args:
+            prim: Object wrapper collection under test.
+            num_prims: Number of prims in the parametrized collection.
+            device: Device expected for returned arrays.
+            backend: Backend name selected by parametrization.
+        """
         for indices, expected_count in draw_indices(count=num_prims, step=2):
             cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for (v0, expected_v0), (v1, expected_v1) in zip(
@@ -102,7 +160,15 @@ class TestGroundPlane(omni.kit.test.AsyncTestCase):
                 check_allclose((expected_v0, expected_v1), output, given=(v0, v1))
 
     @parametrize(backends=["usd"], prim_class=GroundPlane, populate_stage_func=populate_stage)
-    async def test_torsional_patch_radii(self, prim, num_prims, device, backend):
+    async def test_torsional_patch_radii(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test torsional patch radii.
+
+        Args:
+            prim: Object wrapper collection under test.
+            num_prims: Number of prims in the parametrized collection.
+            device: Device expected for returned arrays.
+            backend: Backend name selected by parametrization.
+        """
         # test cases
         # - standard
         for indices, expected_count in draw_indices(count=num_prims, step=2):
@@ -122,7 +188,15 @@ class TestGroundPlane(omni.kit.test.AsyncTestCase):
                 check_allclose(expected_v0, output, given=(v0,))
 
     @parametrize(backends=["usd"], prim_class=GroundPlane, populate_stage_func=populate_stage)
-    async def test_physics_materials(self, prim, num_prims, device, backend):
+    async def test_physics_materials(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test physics materials.
+
+        Args:
+            prim: Object wrapper collection under test.
+            num_prims: Number of prims in the parametrized collection.
+            device: Device expected for returned arrays.
+            backend: Backend name selected by parametrization.
+        """
         from isaacsim.core.experimental.materials import RigidBodyMaterial
 
         choices = [
@@ -164,3 +238,19 @@ class TestGroundPlane(omni.kit.test.AsyncTestCase):
         assert (
             number_of_materials == count
         ), f"{count} materials should have been applied. Applied: {number_of_materials}"
+
+    @parametrize(backends=["usd"], prim_class=GroundPlane, populate_stage_func=populate_stage)
+    async def test_apply_visual_templates(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test apply visual templates.
+
+        Args:
+            prim: Object wrapper collection under test.
+            num_prims: Number of prims in the parametrized collection.
+            device: Device expected for returned arrays.
+            backend: Backend name selected by parametrization.
+        """
+        choices = ["wireframe-blue"]
+        for indices, expected_count in draw_indices(count=num_prims, step=2):
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            for v0, expected_v0 in draw_choice(shape=(expected_count,), choices=choices):
+                prim.apply_visual_templates(v0, indices=indices)

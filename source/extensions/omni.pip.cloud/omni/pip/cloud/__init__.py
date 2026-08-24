@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,19 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
 
 import omni.ext
 
 
 class Extension(omni.ext.IExt):
-    def on_startup(self, ext_id):
+    def on_startup(self, ext_id: Any) -> Any:
         # Force reload of newer typing extensions provided by this extensions prebundle
         from importlib import reload
 
         import typing_extensions
 
         reload(typing_extensions)
+
+    def on_shutdown(self) -> Any:
         pass
 
-    def on_shutdown(self):
-        pass
+
+__all__ = []

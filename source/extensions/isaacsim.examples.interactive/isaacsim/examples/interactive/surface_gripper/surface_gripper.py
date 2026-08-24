@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,51 +13,72 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive example demonstrating surface gripper simulation and control in Isaac Sim."""
+
 import asyncio
 import os
-import weakref
 
 import carb
-
-# Import extension python module we are testing with absolute import path, as if we are external user (other extension)
-import isaacsim.robot.surface_gripper._surface_gripper as surface_gripper
-import numpy as np
+import isaacsim.core.experimental.utils.app as app_utils
 import omni
 import omni.ext
 import omni.kit.app
-import omni.kit.commands
-import omni.kit.usd
 import omni.physics.tensors as physics
-import omni.physx as _physx
 import omni.ui as ui
 import usd.schema.isaac.robot_schema as robot_schema
-from isaacsim.core.prims import SingleRigidPrim
-from isaacsim.core.utils.viewports import set_camera_view
+from isaacsim.core.rendering_manager import ViewportManager
+from isaacsim.core.simulation_manager import SimulationEvent, SimulationManager
 from isaacsim.examples.browser import get_instance as get_browser_instance
-from isaacsim.gui.components.menu import make_menu_item_description
 from isaacsim.gui.components.ui_utils import (
     add_separator,
     btn_builder,
-    combo_floatfield_slider_builder,
     get_style,
     setup_ui_headers,
     state_btn_builder,
 )
-from omni.kit.menu.utils import MenuItemDescription, add_menu_items, remove_menu_items
+from isaacsim.robot.surface_gripper import _surface_gripper as surface_gripper
 from omni.kit.window.property.templates import LABEL_HEIGHT, LABEL_WIDTH
-from pxr import Gf, Sdf, UsdGeom, UsdLux, UsdPhysics
 
 EXTENSION_NAME = "Surface Gripper"
 
 
 class Extension(omni.ext.IExt):
-    def on_startup(self, ext_id: str):
-        """Initialize extension and UI elements"""
+    """Interactive example demonstrating surface gripper simulation in Isaac Sim.
 
+    This extension provides a complete interactive example for working with surface grippers (suction-cup grippers)
+    in Isaac Sim. It demonstrates how to create, configure, and control a surface gripper that can attach to objects
+    through simulated suction by creating joints between the gripper and target objects when they are in close proximity.
+
+    The extension creates a user interface that allows users to:
+    - Load a pre-configured scene with a gantry system containing a surface gripper and objects to manipulate
+    - Control the gripper state (open/close) interactively
+    - Monitor which objects are currently gripped by the surface gripper
+    - Visualize the gripper behavior in real-time during simulation
+
+    The surface gripper is implemented using USD prims with specific schema definitions and is managed through
+    the SurfaceGripperManager interface. The gripper behavior is controlled by configurable parameters such as
+    maximum grip distance, force limits, and retry intervals.
+
+    Key features:
+    - Interactive UI for gripper control and monitoring
+    - Real-time status updates showing gripped objects
+    - Configurable gripper parameters (grip distance, force limits)
+    - Integration with Isaac Sim's physics simulation
+    - Example scene with gantry system and pickable objects
+
+    The extension serves as both a functional tool for testing surface gripper behavior and an educational
+    resource demonstrating best practices for implementing custom gripper systems in Isaac Sim.
+    """
+
+    def on_startup(self, ext_id: str) -> None:
+        """Initialize extension and UI elements.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         self._ext_id = ext_id
 
         # Loads interfaces
-        self._timeline = omni.timeline.get_timeline_interface()
         self._usd_context = omni.usd.get_context()
         self._stage_event_sub = None
         self._window = None
@@ -70,11 +91,13 @@ class Extension(omni.ext.IExt):
 
         self.surface_gripper = None
         self._stage_id = -1
+        self._physics_callback_id = None
 
-    def build_window(self):
-        pass
+    def build_window(self) -> None:
+        """Build the extension window (no-op, UI is built in `build_ui`)."""
 
-    def build_ui(self):
+    def build_ui(self) -> None:
+        """Build the surface gripper example UI panel."""
         self._usd_context = omni.usd.get_context()
         if self._usd_context is not None:
             self._stage_event_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
@@ -131,15 +154,18 @@ class Extension(omni.ext.IExt):
                         ui.StringField(self._models["gripped_objects"])
                     add_separator()
 
-    def on_shutdown(self):
-        self._physx_subs = None
+    def on_shutdown(self) -> None:
+        """Clean up resources when the extension is unloaded."""
+        if self._physics_callback_id is not None:
+            SimulationManager.deregister_callback(self._physics_callback_id)
+            self._physics_callback_id = None
         self._stage_event_sub = None
         self._window = None
         get_browser_instance().deregister_example(name=EXTENSION_NAME, category="Manipulation")
 
-    def _on_update_ui(self, widget):
-        self._models["create_button"].enabled = self._timeline.is_playing()
-        self._models["toggle_button"].enabled = self._timeline.is_playing()
+    def _on_update_ui(self, widget: object) -> None:
+        self._models["create_button"].enabled = app_utils.is_playing()
+        self._models["toggle_button"].enabled = app_utils.is_playing()
         # If the scene has been reloaded, reset UI to create Scenario
         if self._usd_context.get_stage_id() != self._stage_id:
             self._models["create_button"].enabled = True
@@ -150,7 +176,7 @@ class Extension(omni.ext.IExt):
             self._models["create_button"].set_clicked_fn(self._on_create_scenario_button_clicked)
             self._stage_id = -1
 
-    def _toggle_gripper_button_ui(self):
+    def _toggle_gripper_button_ui(self) -> None:
         # Checks if the surface gripper has been created
         status = self.gripper_interface.get_gripper_status(self.gripper_prim_path)
         if status == surface_gripper.GripperStatus.Open:
@@ -158,17 +184,20 @@ class Extension(omni.ext.IExt):
         else:
             self._models["toggle_button"].text = "CLOSED"
 
-    def _on_simulation_step(self, step):
+    def _on_simulation_step(self, step: float, context: object) -> None:
         # Checks if the simulation is playing, and if the stage has been loaded
-        if self._timeline.is_playing() and self._stage_id != -1:
+        if app_utils.is_playing() and self._stage_id != -1:
             self._toggle_gripper_button_ui()
             objects = self.gripper_interface.get_gripped_objects(self.gripper_prim_path)
             self._models["gripped_objects"].set_value("\n".join(objects))
 
-    def _on_reset_scenario_button_clicked(self):
-        pass
+    def _on_reset_scenario_button_clicked(self) -> None:
+        if self._physics_callback_id is not None:
+            SimulationManager.deregister_callback(self._physics_callback_id)
+            self._physics_callback_id = None
+        self._on_create_scenario_button_clicked()
 
-    async def _create_scenario(self, task):
+    async def _create_scenario(self, task: asyncio.Task[object]) -> None:
         done, pending = await asyncio.wait({task})
         if task in done:
             # Repurpose button to reset Scene
@@ -178,7 +207,7 @@ class Extension(omni.ext.IExt):
             # Get Handle for stage and stage ID to check if stage was reloaded
             self._stage = self._usd_context.get_stage()
             self._stage_id = self._usd_context.get_stage_id()
-            self._timeline.stop()
+            app_utils.stop()
             self._models["create_button"].set_clicked_fn(self._on_reset_scenario_button_clicked)
 
             self.gripper_prim_path = "/World/SurfaceGripper"
@@ -223,32 +252,40 @@ class Extension(omni.ext.IExt):
             selection.set_selected_prim_paths([self.gripper_prim_path], False)
 
             self.gripper_start_pose = physics.Transform([0, 0, 1.301], [0, 0, 0, 1])
-            set_camera_view(
-                eye=[2.00, 2.00, 2.00], target=self.gripper_start_pose.p, camera_prim_path="/OmniverseKit_Persp"
+            ViewportManager.set_camera_view(
+                eye=[2.00, 2.00, 2.00], target=list(self.gripper_start_pose.p), camera="/OmniverseKit_Persp"
             )
 
-            self._physx_subs = _physx.get_physx_interface().subscribe_physics_step_events(self._on_simulation_step)
-            self._timeline.play()
+            self._physics_callback_id = SimulationManager.register_callback(
+                self._on_simulation_step, event=SimulationEvent.PHYSICS_POST_STEP
+            )
+            app_utils.play()
 
-    def _on_create_scenario_button_clicked(self):
+    def _on_create_scenario_button_clicked(self) -> None:
         # wait for new stage before creating scenario
         # Load the gantry USD scene
-        async def load_gantry_scene():
+        async def load_gantry_scene() -> None:
             ext_manager = omni.kit.app.get_app().get_extension_manager()
             ext_path = ext_manager.get_extension_path(self._ext_id)
             usd_path = os.path.join(ext_path, "data", "SurfaceGripper_gantry.usda")
             await omni.usd.get_context().new_stage_async()
             stage = omni.usd.get_context().get_stage()
-            # root_layer = stage.GetRootLayer()
-            # root_layer.subLayerPaths.append(usd_path)
             stage.DefinePrim("/World", "Xform").GetReferences().AddReference(usd_path)
             stage.SetDefaultPrim(stage.GetPrimAtPath("/World"))
 
         task = asyncio.ensure_future(load_gantry_scene())
         asyncio.ensure_future(self._create_scenario(task))
 
-    def _on_toggle_gripper_button_clicked(self, val=False):
-        if self._timeline.is_playing():
+    def _on_toggle_gripper_button_clicked(self, val: bool = False) -> None:
+        """Toggles the surface gripper between open and closed states.
+
+        When the timeline is playing, checks the current gripper status and switches it to the opposite state.
+        If the gripper is open, it will be closed. If the gripper is closed, it will be opened.
+
+        Args:
+            val: Boolean value passed from the UI button click event.
+        """
+        if app_utils.is_playing():
             status = self.gripper_interface.get_gripper_status(self.gripper_prim_path)
             if status == surface_gripper.GripperStatus.Open:
                 self.gripper_interface.close_gripper(self.gripper_prim_path)

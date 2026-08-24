@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,28 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Verifies the scale-from-stage-units OmniGraph node can be created and evaluated. Covers graph construction for stage unit scale output."""
 
 import omni.graph.core as og
-import omni.graph.core.tests as ogts
 import omni.kit.test
 
 
 class TestScaleFromStageUnit(omni.kit.test.AsyncTestCase):
-    async def setUp(self):
-        """Set up  test environment, to be torn down when done"""
+    """Verify the stage-unit scale node can be constructed in an action graph."""
+
+    async def setUp(self) -> None:
+        """Set up  test environment, to be torn down when done."""
         await omni.usd.get_context().new_stage_async()
         await omni.kit.app.get_app().next_update_async()
 
     # ----------------------------------------------------------------------
-    async def tearDown(self):
-        pass
+    async def tearDown(self) -> None:
+        """Leave stage cleanup to the next test stage initialization."""
 
     # ----------------------------------------------------------------------
-    async def test_create_scale_node(self):
+    async def test_create_scale_node(self) -> None:
+        """Verify an IsaacScaleToFromStageUnit node can be created and evaluated."""
         graph_path = "/ActionGraph"
         nodeName = "isaac_test_node"
 
-        (test_graph, new_nodes, _, _) = og.Controller.edit(
+        test_graph, new_nodes, _, _ = og.Controller.edit(
             {"graph_path": graph_path, "evaluator_name": "execution"},
             {
                 og.Controller.Keys.CREATE_NODES: [

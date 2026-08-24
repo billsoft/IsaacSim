@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2020-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,32 +51,32 @@ PYBIND11_MODULE(_loop, m)
 
         .def("set_manual_mode", wrapInterfaceFunction(&IRunLoopRunnerImpl::setManualMode),
              R"pbdoc(
-                Sets dt for run loop.
+                Enables or disables manual stepping mode for the run loop.
 
-                Args: 
-                    arg0 (:obj:`bool`): Set to true to enable manual mode.
+                Args:
+                    enabled (:obj:`bool`): Set to true to enable manual mode, false to disable.
 
-                    arg1 (:obj:`str`): The name of the run loop. If name is an empty string, all active run loops are set.
+                    name (:obj:`str`): The name of the run loop. If name is an empty string, all active run loops are set.
 
                 )pbdoc",
-             py::arg("enabled") = "True", py::arg("name") = "")
+             py::arg("enabled") = true, py::arg("name") = "")
         .def("set_manual_step_size", wrapInterfaceFunction(&IRunLoopRunnerImpl::setManualStepSize),
              R"pbdoc(
-                Sets dt for run loop.
+                Sets the time step size (dt) for manual stepping mode.
 
-                Args: 
-                    arg0 (:obj:`double`): The dt value to set to.
+                Args:
+                    dt (:obj:`double`): The time step size in seconds.
 
-                    arg1 (:obj:`str`): The name of the run loop. If name is an empty string, all active run loops are set.
+                    name (:obj:`str`): The name of the run loop. If name is an empty string, all active run loops are set.
 
                 )pbdoc",
-             py::arg("dt") = "0.01667", py::arg("name") = "")
+             py::arg("dt") = 0.01667, py::arg("name") = "")
         .def("get_manual_mode", wrapInterfaceFunction(&IRunLoopRunnerImpl::getManualMode),
              R"pbdoc(
-                Gets the manual mode for the run loop.
+                Gets the manual mode state for the run loop.
 
-                Args: 
-                    arg0 (:obj:`str`): The name of the run loop. If name is an empty string, all active run loops are set.
+                Args:
+                    name (:obj:`str`): The name of the run loop. If name is an empty string, returns the state of the first active run loop.
 
                 Returns:
                     :obj:`bool`: True if manual mode is enabled, false otherwise.
@@ -85,13 +85,13 @@ PYBIND11_MODULE(_loop, m)
              py::arg("name") = "")
         .def("get_manual_step_size", wrapInterfaceFunction(&IRunLoopRunnerImpl::getManualStepSize),
              R"pbdoc(
-                Gets dt for run loop.
+                Gets the time step size (dt) for manual stepping mode.
 
-                Args: 
-                    arg0 (:obj:`str`): The name of the run loop. If name is an empty string, all active run loops are set.
+                Args:
+                    name (:obj:`str`): The name of the run loop. If name is an empty string, returns the step size of the first active run loop.
 
                 Returns:
-                    :obj:`double`: The dt value for the run loop.
+                    :obj:`double`: The time step size in seconds.
 
                 )pbdoc",
              py::arg("name") = "");

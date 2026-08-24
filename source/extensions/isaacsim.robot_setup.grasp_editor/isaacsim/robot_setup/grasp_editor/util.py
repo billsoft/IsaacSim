@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,46 +13,80 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
+"""Utility functions for manipulating rigid bodies, physics colliders, and UI elements in the grasp editor."""
 
 import carb
+import isaacsim.core.experimental.utils.prim as prim_utils
+import isaacsim.core.experimental.utils.transform as transform_utils
+import isaacsim.core.experimental.utils.xform as xform_utils
 import numpy as np
 import omni
-from isaacsim.core.utils.numpy.rotations import quats_to_rot_matrices, rot_matrices_to_quats
-from isaacsim.core.utils.prims import get_prim_at_path
-from isaacsim.core.utils.xforms import get_world_pose
+import warp as wp
 from pxr import PhysxSchema, Sdf, Usd, UsdPhysics
 
 
-def move_rb_subframe_to_position(rb_xform_view, rb_subframe, desired_translation, desired_orientation):
+def move_rb_subframe_to_position(
+    rb_xform_view: object, rb_subframe: object, desired_translation: object, desired_orientation: object
+) -> None:
+    """Move a rigid body by positioning its subframe at the desired location and orientation.
+
+    Calculates the required transformation to place the subframe at the target pose and applies it to the rigid body.
+
+    Args:
+        rb_xform_view: The rigid body transform view to manipulate.
+        rb_subframe: The subframe reference prim.
+        desired_translation: Target translation position for the subframe.
+        desired_orientation: Target orientation for the subframe.
+    """
     # Get position of rb_xform as `a`
     a_trans, a_orient = rb_xform_view.get_world_poses()
+    if isinstance(a_trans, wp.array):
+        a_trans = a_trans.numpy()
+    if isinstance(a_orient, wp.array):
+        a_orient = a_orient.numpy()
     a_trans = a_trans[0]
     a_orient = a_orient[0]
 
     # Get the subframe position as `b`
-    b_trans, b_orient = get_world_pose(rb_subframe)
+    b_trans, b_orient = xform_utils.get_world_pose(rb_subframe, device="cpu")
+    b_trans, b_orient = b_trans.numpy(), b_orient.numpy()
 
     # The goal is to move `a` such that `rb_subframe` ends up at `desired_translation`, `desired_orientation`
     c_trans, c_orient = desired_translation, desired_orientation
 
-    a_rot, b_rot, c_rot = quats_to_rot_matrices(np.vstack([a_orient, b_orient, c_orient]))
+    a_rot, b_rot, c_rot = transform_utils.quaternion_to_rotation_matrix(
+        np.vstack([a_orient, b_orient, c_orient])
+    ).numpy()
 
     a_rot_cmd = c_rot @ b_rot.T @ a_rot
     a_trans_cmd = c_trans + c_rot @ b_rot.T @ (a_trans - b_trans)
 
-    a_orient_cmd = rot_matrices_to_quats(a_rot_cmd)
+    a_orient_cmd = transform_utils.rotation_matrix_to_quaternion(a_rot_cmd).numpy()
 
     rb_xform_view.set_world_poses(a_trans_cmd[np.newaxis, :], a_orient_cmd[np.newaxis, :])
 
 
-def show_physics_colliders(show: bool):
+def show_physics_colliders(show: bool) -> None:
+    """Toggle the visibility of physics colliders in the viewport.
+
+    Controls the physics visualization setting for displaying collision shapes.
+
+    Args:
+        show: Whether to show physics colliders.
+    """
     settings = carb.settings.get_settings()
     num = 2 if show else 0
     settings.set_int("/persistent/physics/visualizationDisplayColliders", num)
 
 
-def unmask_collisions(collision_mask):
+def unmask_collisions(collision_mask: object) -> None:
+    """Remove all collision filtering targets from a collision mask relationship.
+
+    Clears all targets from the provided collision mask to restore normal collision behavior.
+
+    Args:
+        collision_mask: The USD relationship representing the collision mask to clear.
+    """
     [collision_mask.RemoveTarget(target) for target in collision_mask.GetTargets()]
 
 
@@ -60,26 +94,31 @@ def mask_collisions(prim_path_a: str, prim_path_b: str) -> Usd.Relationship:
     """Mask collisions between two prims.  All nested prims will also be included.
 
     Args:
-        prim_path_a (str): Path to a prim
-        prim_path_b (str): Path to a prim
+        prim_path_a: Path to a prim
+        prim_path_b: Path to a prim
 
     Returns:
-        Usd.Relationship: A relationship filtering collisions between prim_path_a and prim_path_b
+        A relationship filtering collisions between prim_path_a and prim_path_b
     """
-    filteringPairsAPI = UsdPhysics.FilteredPairsAPI.Apply(get_prim_at_path(prim_path_a))
+    filteringPairsAPI = UsdPhysics.FilteredPairsAPI.Apply(prim_utils.get_prim_at_path(prim_path_a))
     rel = filteringPairsAPI.CreateFilteredPairsRel()
     rel.AddTarget(Sdf.Path(prim_path_b))
     return rel
 
 
-def convert_prim_to_collidable_rigid_body(prim_path: str, articulation_paths: List[str]) -> None:
-    """Convert a prim to a rigid body by applying the UsdPhysics.RigidBodyAPI
+def convert_prim_to_collidable_rigid_body(prim_path: str, articulation_paths: list[str]) -> str | None:
+    """Convert a prim to a rigid body by applying the UsdPhysics.RigidBodyAPI.
+
     Also sets physics:kinematicEnabled property to true to prevent falling from gravity without needing a fixed joint.
 
     Args:
-        prim_path (str): Path to prim to convert.
+        prim_path: Path to prim to convert.
+        articulation_paths: List of articulation root paths to check against for validation.
+
+    Returns:
+        str | None: Error message string if conversion fails, None on success.
     """
-    prim_to_convert = get_prim_at_path(prim_path)
+    prim_to_convert = prim_utils.get_prim_at_path(prim_path)
     for art_path in articulation_paths:
         if prim_path[: len(art_path)] == art_path:
             return "Cannot convert a part of an Articulation to Rigid Body"
@@ -109,7 +148,14 @@ def convert_prim_to_collidable_rigid_body(prim_path: str, articulation_paths: Li
     UsdPhysics.RigidBodyAPI.Apply(prim_to_convert)
 
 
-def find_all_articulations():
+def find_all_articulations() -> object:
+    """Find all articulation root paths in the current USD stage.
+
+    Scans the stage for articulation roots and joints to identify valid articulation base paths.
+
+    Returns:
+        List of articulation root paths as strings.
+    """
     art_root_paths = []
     articulation_candidates = set()
 
@@ -172,6 +218,13 @@ def find_all_articulations():
     return art_base_paths
 
 
-def adjust_text_block_num_lines(text_block):
+def adjust_text_block_num_lines(text_block: object) -> None:
+    """Adjust the number of lines in a text block based on its content length.
+
+    Calculates the required number of lines assuming 80 characters per line and updates the text block accordingly.
+
+    Args:
+        text_block: The text block widget to adjust.
+    """
     characters_per_line = 80.0  # In a TextBlock of default size
     text_block.set_num_lines(int(max(np.ceil(len(text_block.get_text()) / characters_per_line), 1.0)))

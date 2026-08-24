@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,41 +12,58 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Base classes for creating wrappers around Omni UI widgets to provide simplified interfaces for specific widget types."""
+
 import omni.ui as ui
-from isaacsim.gui.components.ui_utils import get_style
 
 
 class UIWidgetWrapper:
-    """
-    Base class for creating wrappers around any subclass of omni.ui.Widget in order to provide an easy interface
+    """Base class for creating wrappers around any subclass of omni.ui.Widget in order to provide an easy interface.
+
     for creating and managing specific types of widgets such as state buttons or file pickers.
+
+    Args:
+        container_frame: The Omni UI frame that contains the widget.
     """
 
-    def __init__(self, container_frame: ui.Frame):
+    def __init__(self, container_frame: ui.Frame) -> None:
         self._container_frame = container_frame
 
     @property
     def container_frame(self) -> ui.Frame:
+        """The container frame that holds the widget.
+
+        Returns:
+            The UI frame containing this widget.
+        """
         return self._container_frame
 
     @property
     def enabled(self) -> bool:
+        """Whether the widget is enabled for user interaction.
+
+        Returns:
+            True if the widget is enabled, False otherwise.
+        """
         return self.container_frame.enabled
 
     @enabled.setter
-    def enabled(self, value: bool):
+    def enabled(self, value: bool) -> None:
         self.container_frame.enabled = value
 
     @property
     def visible(self) -> bool:
+        """Whether the widget is visible in the UI.
+
+        Returns:
+            True if the widget is visible, False otherwise.
+        """
         return self.container_frame.visible
 
     @visible.setter
-    def visible(self, value: bool):
+    def visible(self, value: bool) -> None:
         self.container_frame.visible = value
 
-    def cleanup(self):
-        """
-        Perform any necessary cleanup
-        """
-        pass
+    def cleanup(self) -> None:
+        """Perform any necessary cleanup."""

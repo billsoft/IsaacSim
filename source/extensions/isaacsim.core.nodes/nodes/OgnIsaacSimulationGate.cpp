@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,9 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// clang-format off
-#include <pch/UsdPCH.h>
-// clang-format on
 
 #include <isaacsim/core/nodes/ICoreNodes.h>
 #include <omni/fabric/FabricUSD.h>
@@ -69,7 +66,7 @@ public:
     }
 
 private:
-    u_int m_frame = 0;
+    unsigned int m_frame = 0;
     omni::timeline::ITimeline* m_timeline = nullptr;
 };
 REGISTER_OGN_NODE()

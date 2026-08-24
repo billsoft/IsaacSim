@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,11 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Generate synthetic video clips in a warehouse using the CosmosWriter."""
+
 from isaacsim import SimulationApp
 
 simulation_app = SimulationApp(launch_config={"headless": False})
 
 import os
+from typing import Any
 
 import carb
 import omni.replicator.core as rep
@@ -43,7 +46,8 @@ CARTER_NAV_POSITION = (-6, 4, 0)
 CARTER_NAV_TARGET_POSITION = (3, 3, 0)
 
 
-def advance_timeline_by_duration(duration: float, max_updates: int = 1000):
+def advance_timeline_by_duration(duration: float, max_updates: int = 1000) -> None:
+    """Advance the simulation timeline by the specified duration in seconds."""
     timeline = omni.timeline.get_timeline_interface()
     current_time = timeline.get_current_time()
     target_time = current_time + duration
@@ -71,12 +75,18 @@ def advance_timeline_by_duration(duration: float, max_updates: int = 1000):
 
         if current_time <= prev_time:
             print(f"Warning: Timeline did not advance at update {step_count} (time: {current_time:.4f}s).")
-    print(f"Finished advancing timeline to {timeline.get_end_time():.4f}s in {step_count} steps")
+    print(f"Finished advancing timeline to {current_time:.4f}s (target {target_time:.4f}s) in {step_count} steps")
 
 
 def run_sdg_pipeline(
-    camera_path, num_clips, num_frames_per_clip, capture_interval, use_instance_id=True, segmentation_mapping=None
-):
+    camera_path: str,
+    num_clips: int,
+    num_frames_per_clip: int,
+    capture_interval: int,
+    use_instance_id: bool = True,
+    segmentation_mapping: dict[str, Any] | None = None,
+) -> None:
+    """Run the synthetic data generation pipeline and capture video clips."""
     rp = rep.create.render_product(camera_path, (1280, 720))
     cosmos_writer = rep.WriterRegistry.get("CosmosWriter")
     backend = rep.backends.get("DiskBackend")
@@ -128,13 +138,14 @@ def run_sdg_pipeline(
 
 
 def run_example(
-    num_clips,
-    num_frames_per_clip,
-    capture_interval,
-    start_delay=0.0,
-    use_instance_id=True,
-    segmentation_mapping=None,
-):
+    num_clips: int,
+    num_frames_per_clip: int,
+    capture_interval: int,
+    start_delay: float = 0.0,
+    use_instance_id: bool = True,
+    segmentation_mapping: dict[str, Any] | None = None,
+) -> None:
+    """Set up the warehouse scene and run the SDG pipeline."""
     assets_root_path = get_assets_root_path()
     stage_path = assets_root_path + STAGE_URL
     print(f"Opening stage: '{stage_path}'")
@@ -173,6 +184,11 @@ def run_example(
     if not camera_prim.IsValid():
         print(f"Camera prim not found at path: {CARTER_CAMERA_PATH}, exiting")
         return
+
+    # tickRate=0 forces autotrigger so the sensor cameras stay in sync with rep.orchestrator.step
+    # under multi-tick rendering.
+    if camera_prim.HasAttribute("omni:sensor:tickRate"):
+        camera_prim.GetAttribute("omni:sensor:tickRate").Set(0.0)
 
     # Advance the timeline with the start delay if provided
     if start_delay is not None and start_delay > 0:

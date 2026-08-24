@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Unit tests for external dependencies and asset conversion functionality."""
+
 import os
 
 import carb
@@ -21,21 +23,25 @@ import omni.kit.test
 
 
 class TestExternalDependencies(omni.kit.test.AsyncTestCase):
-    async def setUp(self):
+    """Tests for external dependencies and asset conversion."""
+
+    async def setUp(self) -> None:
+        """Set up test environment with new stage."""
         await omni.usd.get_context().new_stage_async()
         await omni.kit.app.get_app().next_update_async()
         self.ext_manager = omni.kit.app.get_app().get_extension_manager()
         ext_id = self.ext_manager.get_enabled_extension_id("isaacsim.test.collection")
         self._extension_path = self.ext_manager.get_extension_path(ext_id)
 
-    async def tearDown(self):
+    async def tearDown(self) -> None:
+        """Clean up test environment."""
         await omni.kit.app.get_app().next_update_async()
-        pass
 
-    async def test_asset_converter(self):
+    async def test_asset_converter(self) -> None:
+        """Test that OBJ files can be converted to USD format."""
         import omni.kit.asset_converter
 
-        def progress_callback(progress, total_steps):
+        def progress_callback(progress: object, total_steps: object) -> None:
             pass
 
         converter_context = omni.kit.asset_converter.AssetConverterContext()
@@ -57,6 +63,6 @@ class TestExternalDependencies(omni.kit.test.AsyncTestCase):
         task = instance.create_converter_task(input_obj, output_usd, progress_callback, converter_context)
         success = await task.wait_until_finished()
         if not success:
-            carb.log_error(task.get_status(), task.get_detailed_error())
+            carb.log_error(f"{task.get_status()}, {task.get_error_message()}")
         print("converting done")
         self.assertTrue(os.path.isfile(output_usd))

@@ -1,5 +1,79 @@
 # Changelog
 
+## [1.8.5] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings.
+
+## [1.8.4] - 2026-05-13
+### Fixed
+- Fixed nvbug 6105784: `SearchListItemModel.filter_text()` crashed with `AttributeError: 'list' object has no attribute 'split'` when callers passed a list or tuple of search terms. Added `_normalize_search_filter_text()` to coerce `None`, `list`, and `tuple` inputs to a single string before splitting.
+
+## [1.8.3] - 2026-04-23
+### Fixed
+- Eliminated shell injection risk in `on_open_IDE_clicked` by resolving `code` via `shutil.which()` and removing `shell=True`
+- Eliminated shell injection risk in `on_open_folder_clicked` by replacing `subprocess.Popen(["start", ...], shell=True)` with `os.startfile()` on Windows
+
+## [1.8.2] - 2026-04-20
+### Fixed
+- Return-type annotations in `style.get_folder_picker_icon_button_style()` and `style.get_style()` referenced the builtin `any` function instead of `typing.Any`, making the annotation semantically meaningless. Replaced with `typing.Any`.
+- Widened `style.get_style()` return type to `dict[str, Any]` to accurately describe the `"Tooltip"` entry which is a tuple of style dicts, not a plain dict.
+- Removed a duplicate `"background_color"` key in the `Checkbox` style dict that caused ruff `F601` warnings (the second entry silently overwrote the first).
+- Added missing return type annotations and parameter-type fixes in `widgets.py` (`ANN201`/`ANN202`/`ANN204`); replaced implicit `Optional` defaults (`str = None` → `str | None = None`) on `SelectPrimWidget.__init__` and `DynamicComboBoxModel.get_item_value_model`/`set_item_value_model`; tightened `ParamWidget._build_ui` parameter from `object` to `ParamWidget.FieldDef`; fixed `namedtuple` internal class name (`FormDialogFieldDef` → `FieldDef`) to match the attribute binding.
+
+## [1.8.1] - 2026-04-15
+### Changed
+- UI tweaks for the file icon
+
+## [1.8.0] - 2026-03-21
+### Changed
+- Update UI utils functions based on requirements from isaac sim importers
+
+## [1.7.3] - 2026-03-20
+### Fixed
+- Duplicate import
+- `StateButton.is_in_a_state()` returned `None` instead of `False` when not in state A
+- `StateButton` now guards against identical text for states "A" and "B".
+
+## [1.7.2] - 2026-03-09
+### Fixed
+- Hardened subprocess calls to avoid shell=True with string concatenation
+
+## [1.7.1] - 2026-03-05
+### Fixed
+- Fixed incorrect type annotation for SearchWidget
+
+## [1.7.0] - 2026-03-04
+### Changed
+- Add Overview.md, python_api.md, and update docstrings
+
+## [1.6.1] - 2026-02-23
+### Changed
+- Remove unused dependencies
+
+## [1.6.0] - 2026-02-07
+### Changed
+- Add menu.open_content_browser_to_path to open the Content Browser to a specific path
+
+## [1.5.0] - 2025-12-22
+### Added
+- Add menu.create_submenu to recursively build MenuItemDescription lists from dicts describing submenus
+
+## [1.4.1] - 2025-11-27
+### Changed
+- Add missing docstrings
+
+## [1.4.0] - 2025-10-30
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [1.3.1] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [1.3.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [1.2.1] - 2025-10-09
 ### Removed
 - Combo Box UI Wrapper (Duplicate from DropDown UI Wrapper)
@@ -34,7 +108,7 @@
 
 ## [1.1.3] - 2025-05-11
 ### Changed
-- minor adjustment to the button decorator so it adapts to different button sizes centered.
+- Minor adjustment to the button decorator so it adapts to different button sizes centered.
 
 ## [1.1.2] - 2025-05-10
 ### Changed
@@ -42,11 +116,11 @@
 
 ## [1.1.1] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [1.1.0] - 2025-05-03
 ### Changed
-- add an optional set_on_end_edit_fn callback for float fields
+- Add an optional set_on_end_edit_fn callback for float fields
 
 ## [1.0.14] - 2025-04-09
 ### Changed
@@ -87,11 +161,11 @@
 
 ## [1.0.4] - 2025-01-13
 ### Changed
-- fixed button tooltips
+- Fixed button tooltips
 
 ## [1.0.3] - 2024-10-29
 ### Changed
-- added an info_collapsed argument for setup_ui_headers
+- Added an info_collapsed argument for setup_ui_headers
 
 ## [1.0.2] - 2024-10-28
 ### Changed
@@ -115,7 +189,7 @@
 
 ## [0.15.1] - 2024-04-13
 ### Added
-- optional tooltip entry for SelectPrimWidget and ParamWidget
+- Optional tooltip entry for SelectPrimWidget and ParamWidget
 
 ## [0.15.0] - 2024-03-14
 ### Added
@@ -228,14 +302,14 @@
 
 ## [0.5.2] - 2023-01-19
 ### Fixed
-- split calback tests to reduce errors
+- Split calback tests to reduce errors
 
 ### Changed
-- rename startup to test_ui
+- Rename startup to test_ui
 
 ## [0.5.1] - 2023-01-11
 ### Fixed
-- revert to old menu click function to fix hot reload errors
+- Revert to old menu click function to fix hot reload errors
 
 ## [0.5.0] - 2023-01-06
 ### Added
@@ -267,7 +341,7 @@
 
 ## [0.2.1] - 2022-06-02
 ### Changed
-- expose labels for file/folder picker
+- Expose labels for file/folder picker
 
 ## [0.2.0] - 2022-05-25
 ### Added
@@ -279,7 +353,7 @@
 
 ## [0.1.2] - 2021-12-14
 ### Changed
-- adjust tooltip for ui Buttons with changed background color
+- Adjust tooltip for ui Buttons with changed background color
 
 ## [0.1.1] - 2021-09-28
 ### Fixed

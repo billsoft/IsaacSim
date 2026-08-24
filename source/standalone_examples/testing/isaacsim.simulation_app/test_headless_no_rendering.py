@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,10 +28,11 @@ required_extensions = [
     "omni.kit.loop",
     "omni.kit.usd.mdl",
     "omni.usd.metrics.assembler.ui",
+    "omni.hydra.usdrt_delegate",
 ]
 
 # Create extra_args list using a loop
-extra_args = []
+extra_args = [f"--/app/exts/folders=['apps','exts','extscache','extsUser','extsDeprecated']"]
 for extension in required_extensions:
     extra_args.extend(["--enable", extension])
 

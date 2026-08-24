@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2022-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,17 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Convert OmniGraph numeric values between meters and the current USD stage units."""
+
+from typing import Any
+
+import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.graph.core as og
-from isaacsim.core.utils.stage import get_stage_units
 
 
 class OgnIsaacScaleToFromStageUnit:
-    """
-    Isaac Sim Scale To and From Stage Units
-    """
+    """Isaac Sim Scale To and From Stage Units."""
 
     @staticmethod
-    def compute(db) -> bool:
+    def compute(db: Any) -> bool:
+        """Apply the requested `toStage` or `toMeters` conversion and reject missing or custom modes.
+
+        Args:
+            db: OmniGraph database for this node.
+
+        Returns:
+            True when conversion succeeds, False otherwise.
+        """
         conversion = db.inputs.conversion
         value = db.inputs.value.value
 
@@ -36,15 +46,20 @@ class OgnIsaacScaleToFromStageUnit:
             return False
 
         if conversion in db.tokens.toStage:
-            db.outputs.result.value = value / get_stage_units()
+            db.outputs.result.value = value / stage_utils.get_stage_units()[0]
 
         elif conversion in db.tokens.toMeters:
-            db.outputs.result.value = value * get_stage_units()
+            db.outputs.result.value = value * stage_utils.get_stage_units()[0]
 
         return True
 
     @staticmethod
-    def on_connection_type_resolve(node) -> None:
+    def on_connection_type_resolve(node: Any) -> None:
+        """Resolve the output type from the input value type, promoting integer inputs to double.
+
+        Args:
+            node: OmniGraph node whose connection types are being resolved.
+        """
         int_types = (
             og.BaseDataType.UCHAR,
             og.BaseDataType.INT,

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Literal
+"""Verifies GeomPrim runtime creation and collision-related property access. Covers collision enablement, collision approximation, contact offsets, torsional patch radii, and physics materials."""
+
+from typing import Any, Literal
 
 import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
@@ -34,7 +36,14 @@ from .common import (
 )
 
 
-async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"], **kwargs) -> None:
+async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"], **kwargs: Any) -> None:
+    """Populate stage.
+
+    Args:
+        max_num_prims: Maximum number of prims to create for a test case.
+        operation: Stage population operation to use.
+        **kwargs: Additional keyword arguments.
+    """
     assert operation == "wrap", "Other operations except 'wrap' are not supported"
     # create new stage
     await stage_utils.create_new_stage_async()
@@ -47,27 +56,69 @@ async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"
 
 
 class TestGeomPrim(omni.kit.test.AsyncTestCase):
-    async def setUp(self):
-        """Method called to prepare the test fixture"""
+    """Test geom prim."""
+
+    async def setUp(self) -> None:
+        """Method called to prepare the test fixture."""
         super().setUp()
 
-    async def tearDown(self):
-        """Method called immediately after the test method has been called"""
+    async def tearDown(self) -> None:
+        """Method called immediately after the test method has been called."""
         super().tearDown()
 
     # --------------------------------------------------------------------
 
-    def check_backend(self, backend, rigid_prim):
-        pass
+    def check_backend(self, backend: Any, rigid_prim: Any) -> None:
+        """Check backend.
+
+        Args:
+            backend: Backend name under test.
+            rigid_prim: Value passed by the caller.
+        """
 
     # --------------------------------------------------------------------
 
+    @parametrize(
+        backends=["tensor"],  # "tensor" backend plays the simulation
+        instances=["one"],
+        operations=["wrap"],
+        prim_class=lambda *args, **kwargs: None,
+        populate_stage_func=populate_stage,
+        max_num_prims=1,
+    )
+    async def test_runtime_instance_creation(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test runtime instance creation.
+
+        Args:
+            prim: Prim or prim wrapper under test.
+            num_prims: Number of prims under test.
+            device: Device under test.
+            backend: Backend name under test.
+        """
+        GeomPrim("/World/A_0")
+
     @parametrize(backends=["usd"], operations=["wrap"], prim_class=GeomPrim, populate_stage_func=populate_stage)
-    async def test_len(self, prim, num_prims, device, backend):
+    async def test_len(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test len.
+
+        Args:
+            prim: Prim or prim wrapper under test.
+            num_prims: Number of prims under test.
+            device: Device under test.
+            backend: Backend name under test.
+        """
         self.assertEqual(len(prim), num_prims, f"Invalid GeomPrim ({num_prims} prims) len")
 
     @parametrize(backends=["usd"], operations=["wrap"], prim_class=GeomPrim, populate_stage_func=populate_stage)
-    async def test_enabled_collisions(self, prim, num_prims, device, backend):
+    async def test_enabled_collisions(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test enabled collisions.
+
+        Args:
+            prim: Prim or prim wrapper under test.
+            num_prims: Number of prims under test.
+            device: Device under test.
+            backend: Backend name under test.
+        """
         # check backend
         self.check_backend(backend, prim)
         # test cases
@@ -81,7 +132,15 @@ class TestGeomPrim(omni.kit.test.AsyncTestCase):
                 check_allclose(expected_v0, output, given=(v0,))
 
     @parametrize(backends=["usd"], operations=["wrap"], prim_class=GeomPrim, populate_stage_func=populate_stage)
-    async def test_collision_approximations(self, prim, num_prims, device, backend):
+    async def test_collision_approximations(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test collision approximations.
+
+        Args:
+            prim: Prim or prim wrapper under test.
+            num_prims: Number of prims under test.
+            device: Device under test.
+            backend: Backend name under test.
+        """
         choices = [
             "none",
             "convexDecomposition",
@@ -115,7 +174,15 @@ class TestGeomPrim(omni.kit.test.AsyncTestCase):
             check_lists(expected_v0, output)
 
     @parametrize(backends=["usd"], operations=["wrap"], prim_class=GeomPrim, populate_stage_func=populate_stage)
-    async def test_offsets(self, prim, num_prims, device, backend):
+    async def test_offsets(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test offsets.
+
+        Args:
+            prim: Prim or prim wrapper under test.
+            num_prims: Number of prims under test.
+            device: Device under test.
+            backend: Backend name under test.
+        """
         # check backend
         self.check_backend(backend, prim)
         # test cases
@@ -132,7 +199,15 @@ class TestGeomPrim(omni.kit.test.AsyncTestCase):
                 check_allclose((expected_v0, expected_v1), output, given=(v0, v1))
 
     @parametrize(backends=["usd"], operations=["wrap"], prim_class=GeomPrim, populate_stage_func=populate_stage)
-    async def test_torsional_patch_radii(self, prim, num_prims, device, backend):
+    async def test_torsional_patch_radii(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test torsional patch radii.
+
+        Args:
+            prim: Prim or prim wrapper under test.
+            num_prims: Number of prims under test.
+            device: Device under test.
+            backend: Backend name under test.
+        """
         # check backend
         self.check_backend(backend, prim)
         # test cases
@@ -156,7 +231,15 @@ class TestGeomPrim(omni.kit.test.AsyncTestCase):
                 check_allclose(expected_v0, output, given=(v0,))
 
     @parametrize(backends=["usd"], operations=["wrap"], prim_class=GeomPrim, populate_stage_func=populate_stage)
-    async def test_physics_materials(self, prim, num_prims, device, backend):
+    async def test_physics_materials(self, prim: Any, num_prims: Any, device: Any, backend: Any) -> None:
+        """Test physics materials.
+
+        Args:
+            prim: Prim or prim wrapper under test.
+            num_prims: Number of prims under test.
+            device: Device under test.
+            backend: Backend name under test.
+        """
         from isaacsim.core.experimental.materials import RigidBodyMaterial
 
         choices = [

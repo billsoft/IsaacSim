@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,19 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Set the texture resolution for a named or active viewport from OmniGraph inputs."""
+
+from typing import Any
+
 import carb
 import omni
-from isaacsim.core.utils.carb import set_carb_setting
 from omni.kit.viewport.utility import get_active_viewport, get_viewport_from_window_name
 
 
 class OgnIsaacSetViewportResolution:
-    """
-    Isaac Sim Set Viewport Resolution
-    """
+    """Isaac Sim Set Viewport Resolution."""
 
     @staticmethod
-    def compute(db) -> bool:
+    def compute(db: Any) -> bool:
+        """Apply the requested width and height when a viewport resolves, then enable `execOut`.
+
+        Args:
+            db: OmniGraph database for this node.
+
+        Returns:
+            True after the node executes.
+        """
         viewport_name = db.inputs.viewport
         if viewport_name:
             viewport_api = get_viewport_from_window_name(viewport_name)
@@ -34,8 +43,9 @@ class OgnIsaacSetViewportResolution:
 
         if viewport_api:
             viewport_api.set_texture_resolution((db.inputs.width, db.inputs.height))
-            set_carb_setting(carb.settings.get_settings(), "/app/hydra/aperture/conform", 3)
-            set_carb_setting(carb.settings.get_settings(), "/app/hydra/aperture/conform", 4)
+            settings = carb.settings.get_settings()
+            settings.set_int("/app/hydra/aperture/conform", 3)
+            settings.set_int("/app/hydra/aperture/conform", 4)
 
         db.outputs.execOut = omni.graph.core.ExecutionAttributeState.ENABLED
         return True

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,13 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Base wrapper class for managing USD prims with support for regex path matching and batch operations."""
+
 from __future__ import annotations
 
 import re
 from abc import ABC
+from typing import Any
 
+import isaacsim.core.experimental.utils.prim as prim_utils
 import isaacsim.core.experimental.utils.stage as stage_utils
-import isaacsim.core.utils.prims as prims_utils
 import warp as wp
 from isaacsim.core.simulation_manager import IsaacEvents, SimulationManager
 from pxr import Sdf, Usd
@@ -49,6 +52,7 @@ class Prim(ABC):
 
     Raises:
         ValueError: If no prims are found matching the specified path(s).
+        AssertionError: If specified paths correspond to non-existing prims.
 
     Example:
 
@@ -171,7 +175,7 @@ class Prim(ABC):
     """
 
     @staticmethod
-    def ensure_api(prims: list[Usd.Prim], api: type, *args, **kwargs) -> list[type["UsdAPISchemaBase"]]:
+    def ensure_api(prims: list[Usd.Prim], api: type, *args: Any, **kwargs: Any) -> list[type["UsdAPISchemaBase"]]:
         """Ensure that all prims have the specified API schema applied.
 
         Backends: :guilabel:`usd`.
@@ -219,16 +223,10 @@ class Prim(ABC):
         Raises:
             ValueError: If resulting paths are mixed or invalid and ``raise_on_mixed_paths`` is True.
         """
-        # TODO: check if a generic regex search (when specialized one fails) is working with physics view
-        # [
-        #     res.string
-        #     for prim in stage_utils.traverse_stage()
-        #     if (res := re.search(path, prims_utils.get_prim_path(prim)))
-        # ]
         existing_paths, nonexistent_paths, invalid_paths = [], [], []
         paths = [paths] if isinstance(paths, str) else paths
         for path in paths:
-            result = prims_utils.find_matching_prim_paths(path)
+            result = prim_utils.find_matching_prim_paths(path)
             # existing paths, it could be a regex or a single path
             if result:
                 existing_paths.append(result)
@@ -283,7 +281,7 @@ class Prim(ABC):
 
     def _deregister_callbacks(self) -> None:
         """Deregister all internal callbacks."""
-        for callback_id in self._callback_ids:
+        for callback_id in getattr(self, "_callback_ids", []):
             SimulationManager.deregister_callback(callback_id)
         self._callback_ids = []
 
@@ -291,8 +289,12 @@ class Prim(ABC):
     Internal callbacks.
     """
 
-    def _on_physics_ready(self, event) -> None:
-        """Handle physics ready event."""
+    def _on_physics_ready(self, event: object) -> None:
+        """Handle physics ready event.
+
+        Args:
+            event: The physics ready event.
+        """
         self._device = wp.get_device(SimulationManager.get_physics_sim_device())
 
     def _on_prim_deletion(self, prim_path: str) -> None:

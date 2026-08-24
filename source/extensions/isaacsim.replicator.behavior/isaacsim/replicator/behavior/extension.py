@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,12 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension module that provides behavior-based functionality for Isaac Sim Replicator."""
+
 import omni.ext
 
 
 class Extension(omni.ext.IExt):
-    def on_startup(self, ext_id):
-        pass
+    """Extension for the isaacsim.replicator.behavior module.
 
-    def on_shutdown(self):
-        pass
+    This extension provides behavior-based functionality for Isaac Sim Replicator, enabling
+    advanced simulation scenarios with dynamic object behaviors and interactions.
+    """
+
+    def on_startup(self, ext_id: str) -> None:
+        """Called when the extension is started.
+
+        Args:
+            ext_id: The extension identifier.
+        """
+
+    def on_shutdown(self) -> None:
+        """Called when the extension is stopped."""

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,20 +13,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
+"""Extension for recording synthetic data in Isaac Sim through the Replicator framework."""
 
 import omni.ext
-import omni.ui as ui
 from omni.kit.menu.utils import MenuHelperExtensionFull
 
 from .synthetic_recorder_window import SyntheticRecorderWindow
 
 
 class SyntheticRecorderExtension(omni.ext.IExt, MenuHelperExtensionFull):
-    WINDOW_NAME = "Synthetic Data Recorder"
-    MENU_GROUP = "Tools/Replicator"
+    """Extension for recording synthetic data in Isaac Sim.
 
-    def on_startup(self, ext_id):
+    This extension provides a user interface for recording synthetic sensor data and annotations
+    through the Replicator framework. It adds a "Synthetic Data Recorder" window accessible
+    from the Tools/Replicator menu, enabling users to configure and manage synthetic data
+    recording sessions for machine learning workflows.
+    """
+
+    WINDOW_NAME = "Synthetic Data Recorder"
+    """The name displayed in the window title bar."""
+    MENU_GROUP = "Tools/Replicator"
+    """The menu group path where the extension appears in the application menu."""
+
+    def on_startup(self, ext_id: str) -> None:
+        """Called when the Synthetic Data Recorder extension is starting up.
+
+        Adds the Synthetic Data Recorder window to the Tools/Replicator menu group.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         # Add the menu item
         self.menu_startup(
             lambda: SyntheticRecorderWindow(SyntheticRecorderExtension.WINDOW_NAME, ext_id),
@@ -35,5 +51,9 @@ class SyntheticRecorderExtension(omni.ext.IExt, MenuHelperExtensionFull):
             SyntheticRecorderExtension.MENU_GROUP,
         )
 
-    def on_shutdown(self):
+    def on_shutdown(self) -> None:
+        """Called when the Synthetic Data Recorder extension is shutting down.
+
+        Removes the menu items created during startup.
+        """
         self.menu_shutdown()

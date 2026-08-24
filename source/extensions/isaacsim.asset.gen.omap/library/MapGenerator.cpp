@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -127,11 +127,12 @@ MapGenerator::MapGenerator(omni::physx::IPhysx* physXPtr, pxr::UsdStageWeakPtr s
  * Cleans up resources used by the generator, specifically
  * deallocating the octree to prevent memory leaks.
  *
- * @post m_tree will be deleted and set to nullptr
+ * @post m_tree will be deleted
  */
 MapGenerator::~MapGenerator()
 {
     delete m_tree;
+    m_tree = nullptr;
 }
 
 /**
@@ -308,13 +309,13 @@ void MapGenerator::generate3d()
 {
     if (!m_physxScenePtr)
     {
-        printf("No Physics Scene Present\n");
+        CARB_LOG_ERROR("Physics scene not initialized");
         return;
     }
 
     if (!m_tree)
     {
-        printf("Tree not valid\n");
+        CARB_LOG_ERROR("Octree not initialized");
         return;
     }
 

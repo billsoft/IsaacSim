@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,12 +14,14 @@
 # limitations under the License.
 
 launch_config:
-  renderer: RaytracedLighting
+  renderer: RealTimePathTracing
   headless: false
 resolution: [512, 512]
 env_url: "/Isaac/Environments/Grid/default_environment.usd"
 rt_subframes: 32
 writer: BasicWriter
-writer_config:
+backend_type: DiskBackend
+backend_params:
   output_dir: _out_basicwriter
+writer_config:
   rgb: true

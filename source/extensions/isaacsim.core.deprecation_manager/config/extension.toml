@@ -1,11 +1,11 @@
 [package]
-version = "0.2.7"
+version = "0.4.2"
 category = "Utility"
 title = "Deprecation manager"
 description = "Manage deprecated OmniGraph nodes and app/extension settings"
 keywords = ["isaacsim", "deprecation", "manager"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -19,16 +19,20 @@ writeTarget.kit = true
 name = "isaacsim.core.deprecation_manager"
 
 [settings]
-# list of deprecated settings and their replacements
+# List of deprecated settings and their replacements.
 exts."isaacsim.core.deprecation_manager".settings = [
     # omni.isaac.benchmark.services -> isaacsim.benchmark.services
     { deprecated = "/exts/omni.isaac.benchmark.services/metrics/metrics_output_folder", new = "/exts/isaacsim.benchmark.services/metrics/metrics_output_folder", update = true },
     { deprecated = "/exts/omni.isaac.benchmark.services/metrics/nvdataflow_default_test_suite_name", new = "/exts/isaacsim.benchmark.services/metrics/nvdataflow_default_test_suite_name", update = true },
     { deprecated = "/exts/omni.isaac.benchmark.services/metrics/randomize_filename_prefix", new = "/exts/isaacsim.benchmark.services/metrics/randomize_filename_prefix", update = true },
-    # omni.isaac.vscode -> isaacsim.code_editor.vscode
-    { deprecated = "/exts/omni.isaac.vscode/host", new = "/exts/isaacsim.code_editor.vscode/host", update = true },
-    { deprecated = "/exts/omni.isaac.vscode/port", new = "/exts/isaacsim.code_editor.vscode/port", update = true },
-    { deprecated = "/exts/omni.isaac.vscode/carb_logs", new = "/exts/isaacsim.code_editor.vscode/carb_logs", update = true },
+    # omni.isaac.vscode -> isaacsim.code_editor.python_server
+    { deprecated = "/exts/omni.isaac.vscode/host", new = "/exts/isaacsim.code_editor.python_server/host", update = true },
+    { deprecated = "/exts/omni.isaac.vscode/port", new = "/exts/isaacsim.code_editor.python_server/port", update = true },
+    { deprecated = "/exts/omni.isaac.vscode/carb_logs", new = "/exts/isaacsim.code_editor.python_server/carb_logs", update = true },
+    # isaacsim.code_editor.vscode -> isaacsim.code_editor.python_server
+    { deprecated = "/exts/isaacsim.code_editor.vscode/host", new = "/exts/isaacsim.code_editor.python_server/host", update = true },
+    { deprecated = "/exts/isaacsim.code_editor.vscode/port", new = "/exts/isaacsim.code_editor.python_server/port", update = true },
+    { deprecated = "/exts/isaacsim.code_editor.vscode/carb_logs", new = "/exts/isaacsim.code_editor.python_server/carb_logs", update = true },
     # omni.isaac.jupyter_notebook -> isaacsim.code_editor.jupyter
     { deprecated = "/exts/omni.isaac.jupyter_notebook/host", new = "/exts/isaacsim.code_editor.jupyter/host", update = true },
     { deprecated = "/exts/omni.isaac.jupyter_notebook/port", new = "/exts/isaacsim.code_editor.jupyter/port", update = true },
@@ -45,12 +49,8 @@ exts."isaacsim.core.deprecation_manager".settings = [
     { deprecated = "/exts/omni.isaac.ros2_bridge/publish_multithreading_disabled", new = "/exts/isaacsim.ros2.bridge/publish_multithreading_disabled", update = true },
     # omni.isaac.tf_viewer -> isaacsim.ros2.tf_viewer
     { deprecated = "/exts/omni.isaac.tf_viewer/cpp", new = "/exts/isaacsim.ros2.tf_viewer/cpp", update = true },
-    { deprecated = "/exts/omni.isaac.asset_browser/folder", new = "/exts/isaacsim.asset.browser/folder", update = true },
-    { deprecated = "/exts/omni.isaac.asset_browser/instanceable", new = "/exts/isaacsim.asset.browser/instanceable", update = true },
-    { deprecated = "/exts/omni.isaac.asset_browser/data/timeout", new = "/exts/isaacsim.asset.browser/data/timeout", update = true },
-    { deprecated = "/exts/omni.isaac.asset_browser/visible_after_startup", new = "/exts/isaacsim.asset.browser/visible_after_startup", update = true },
 ]
-# List of deprecated OmniGraph nodes and their replacements
+# List of deprecated OmniGraph nodes and their replacements.
 exts."isaacsim.core.deprecation_manager".omnigraph = [
     { deprecated = "omni.isaac.isaac_sensor", new = "isaacsim.sensors.rtx" },
     { deprecated = "omni.isaac.conveyor", new = "isaacsim.asset.gen.conveyor" },
@@ -86,3 +86,6 @@ exts."isaacsim.core.deprecation_manager".omnigraph = [
     { deprecated = "omni.replicator.isaac.OgnDope", new = "isaacsim.replicator.writers.OgnDope" },
     { deprecated = "omni.replicator.isaac.OgnPose", new = "isaacsim.replicator.writers.OgnPose" },
 ]
+
+[documentation]
+pages = ["docs/Overview.md","docs/SETTINGS.md", "docs/CHANGELOG.md"]

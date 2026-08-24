@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,25 +13,70 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Verifies custom Replicator randomizer examples implemented with mathematical distributions and OmniGraph nodes. The tests exercise both direct randomizer execution and graph-based custom randomization."""
+
+from typing import Any
+
 import omni.kit
 import omni.usd
-from isaacsim.core.utils.stage import create_new_stage_async
+from isaacsim.core.experimental.utils.stage import create_new_stage_async
 
 
 class TestOgnCustomReplicatorRandomizer(omni.kit.test.AsyncTestCase):
-    async def setUp(self):
+    """Test class for demonstrating custom replicator randomization techniques.
+
+    This class provides comprehensive test cases for implementing and using custom randomizers
+    within Omniverse Replicator. It demonstrates two approaches: manual randomization using pure
+    Python code and automated randomization using Omniverse Graph (OmniGraph) nodes.
+
+    The test class showcases three distinct spatial distribution patterns:
+
+    * Point sampling on sphere surfaces for objects positioned at exact distances
+    * Point sampling within sphere volumes for objects distributed throughout 3D spaces
+    * Point sampling between concentric spheres for objects in annular regions
+
+    The first test method demonstrates manual randomization by implementing mathematical algorithms
+    for uniform spatial distribution. It creates 1,500 primitives (spheres, cubes, cylinders) and
+    applies randomized positions and rotations using custom Python functions that ensure proper
+    spatial uniformity.
+
+    The second test method demonstrates automated randomization through custom OmniGraph nodes.
+    It defines replicator wrapper functions that interface with specialized nodes:
+    ``isaacsim.replicator.examples.OgnSampleOnSphere``, ``isaacsim.replicator.examples.OgnSampleInSphere``,
+    and ``isaacsim.replicator.examples.OgnSampleBetweenSpheres``. These nodes provide the same
+    spatial distribution capabilities as the manual approach but integrate seamlessly with
+    Omniverse Replicator's orchestration system.
+
+    Both approaches handle proper mathematical considerations for uniform distribution, including
+    cube root scaling for volumetric sampling and cosine theta sampling for spherical coordinates.
+    The test validates that custom randomizers can be successfully integrated into Replicator
+    workflows while maintaining proper spatial distribution properties.
+    """
+
+    async def setUp(self) -> None:
+        """Set up the test environment by creating a new stage."""
         await omni.kit.app.get_app().next_update_async()
         await create_new_stage_async()
         await omni.kit.app.get_app().next_update_async()
 
-    async def tearDown(self):
+    async def tearDown(self) -> None:
+        """Clean up the test environment by closing the stage and waiting for assets to finish loading."""
         omni.usd.get_context().close_stage()
         await omni.kit.app.get_app().next_update_async()
         # In some cases the test will end before the asset is loaded, in this case wait for assets to load
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             await omni.kit.app.get_app().next_update_async()
 
-    async def test_custom_randomizer(self):
+    async def test_custom_randomizer(self) -> Any:
+        """Test custom randomizer implementations for distributing prims on sphere surfaces and volumes.
+
+        Creates 500 prims of each type (spheres, cubes, cylinders) and randomizes their positions using
+        custom mathematical distribution functions: on sphere surface, within sphere volume, and between
+        two concentric spheres.
+
+        Returns:
+            None.
+        """
         import math
         import random
         from itertools import chain
@@ -40,7 +85,7 @@ class TestOgnCustomReplicatorRandomizer(omni.kit.test.AsyncTestCase):
         from pxr import UsdGeom
 
         # Generate a random 3D point on the surface of a sphere of a given radius.
-        def random_point_on_sphere(radius):
+        def random_point_on_sphere(radius: Any) -> Any:
             # Generate a random direction by spherical coordinates (phi, theta)
             phi = random.uniform(0, 2 * math.pi)
             # Sample costheta to ensure uniform distribution of points on the sphere (surface is proportional to sin(theta))
@@ -55,7 +100,7 @@ class TestOgnCustomReplicatorRandomizer(omni.kit.test.AsyncTestCase):
             return x, y, z
 
         # Generate a random 3D point within a sphere of a given radius, ensuring a uniform distribution throughout the volume.
-        def random_point_in_sphere(radius):
+        def random_point_in_sphere(radius: Any) -> Any:
             # Generate a random direction by spherical coordinates (phi, theta)
             phi = random.uniform(0, 2 * math.pi)
             # Sample costheta to ensure uniform distribution of points on the sphere (surface is proportional to sin(theta))
@@ -74,7 +119,7 @@ class TestOgnCustomReplicatorRandomizer(omni.kit.test.AsyncTestCase):
             return x, y, z
 
         # Generate a random 3D point between two spheres, ensuring a uniform distribution throughout the volume.
-        def random_point_between_spheres(radius1, radius2):
+        def random_point_between_spheres(radius1: Any, radius2: Any) -> Any:
             # Ensure radius1 < radius2
             if radius1 > radius2:
                 radius1, radius2 = radius2, radius1
@@ -139,7 +184,15 @@ class TestOgnCustomReplicatorRandomizer(omni.kit.test.AsyncTestCase):
                 rand_loc = random_point_between_spheres(rad_bet1, rad_bet2)
                 between_spheres_prim.GetAttribute("xformOp:translate").Set(rand_loc)
 
-    async def test_custom_replicator_randomizer_graph(self):
+    async def test_custom_replicator_randomizer_graph(self) -> Any:
+        """Test custom replicator randomizer graph using Omni Replicator framework.
+
+        Creates 50 prims of each type and applies randomization using custom replicator nodes for
+        sphere-based distribution patterns. Tests the integration with omni.replicator.core framework.
+
+        Returns:
+            None.
+        """
         import omni.replicator.core as rep
         from omni.replicator.core.scripts.utils import ReplicatorItem, ReplicatorWrapper, create_node, set_target_prims
 

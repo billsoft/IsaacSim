@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,19 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Verifies the CreateViewport OmniGraph node creates and registers a viewport through the rendering manager. Covers graph execution and viewport output creation."""
 
 import carb
+import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.graph.core as og
 import omni.graph.core.tests as ogts
 import omni.kit.test
-from isaacsim.core.api.robots import Robot
-from isaacsim.core.utils.stage import open_stage_async
-from isaacsim.core.utils.viewports import destroy_all_viewports, get_viewport_names
+from isaacsim.core.rendering_manager import ViewportManager
 from isaacsim.storage.native import get_assets_root_path_async
 
 
 class TestCreateViewport(ogts.OmniGraphTestCase):
-    async def setUp(self):
+    """Verify viewport graph creation and registration with the rendering manager."""
+
+    async def setUp(self) -> None:
+        """Create a fresh stage for viewport graph execution."""
         await omni.usd.get_context().new_stage_async()
         self._timeline = omni.timeline.get_timeline_interface()
         # add franka robot for test
@@ -33,21 +36,21 @@ class TestCreateViewport(ogts.OmniGraphTestCase):
         if assets_root_path is None:
             carb.log_error("Could not find Isaac Sim assets folder")
             return
-        (result, error) = await open_stage_async(
-            assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
-        )
+        await stage_utils.open_stage_async(assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd")
 
     # ----------------------------------------------------------------------
-    async def tearDown(self):
+    async def tearDown(self) -> None:
+        """Close the viewport created by the test and reset the stage."""
         # cleanup extra viewports created in test
-        destroy_all_viewports(destroy_main_viewport=False)
+        ViewportManager.destroy_viewport_windows(exclude=["Viewport"])
         await omni.kit.app.get_app().next_update_async()
         # Clean up test
         await omni.kit.stage_templates.new_stage_async()
 
     # ----------------------------------------------------------------------
-    async def test_create_viewport(self):
-        (test_graph, new_nodes, _, _) = og.Controller.edit(
+    async def test_create_viewport(self) -> None:
+        """Verify the node creates a viewport and publishes its title."""
+        test_graph, new_nodes, _, _ = og.Controller.edit(
             {"graph_path": "/ActionGraph", "evaluator_name": "execution"},
             {
                 og.Controller.Keys.CREATE_NODES: [
@@ -67,10 +70,10 @@ class TestCreateViewport(ogts.OmniGraphTestCase):
         )
 
         # await og.Controller.evaluate(test_graph)
-        self.assertEquals(len(get_viewport_names()), 1)
+        self.assertEqual(len(ViewportManager.get_viewport_windows()), 1)
         # check where the joints are after evaluate
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
         await omni.kit.app.get_app().next_update_async()
         await omni.kit.app.get_app().next_update_async()
-        self.assertEquals(len(get_viewport_names()), 2)
+        self.assertEqual(len(ViewportManager.get_viewport_windows()), 2)

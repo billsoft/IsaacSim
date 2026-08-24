@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,12 +18,12 @@ import argparse
 import glob
 import json
 import os
+import shlex
 import subprocess
 import sys
 import time
 import xml.etree.ElementTree as ET
 from collections import defaultdict
-from datetime import datetime
 
 # Default arguments that are always passed to test scripts
 DEFAULT_SCRIPT_ARGS = ["--no-window"]
@@ -144,16 +144,15 @@ def run_scripts(suites, dry_run=False, print_live_output=False, failure_keywords
                         # Build command with default arguments plus any additional user arguments
                         all_args = DEFAULT_SCRIPT_ARGS.copy()
                         if script_args:
-                            # Split user args and add them to defaults
-                            user_args = script_args.split()
+                            user_args = shlex.split(script_args)
                             all_args.extend(user_args)
 
-                        command = f"{script} {' '.join(all_args)}"
+                        command = [script] + all_args
 
                         start_time = time.time()
                         if print_live_output:
-                            print(f"\n===== Running: {command} =====")
-                            proc = subprocess.run(command, text=True, shell=True)
+                            print(f"\n===== Running: {shlex.join(command)} =====")
+                            proc = subprocess.run(command, text=True)
                             end_time = time.time()
                             duration = end_time - start_time
                             # For live output, we can't check keywords since output isn't captured
@@ -170,7 +169,7 @@ def run_scripts(suites, dry_run=False, print_live_output=False, failure_keywords
                                 }
                             )
                         else:
-                            proc = subprocess.run(command, capture_output=True, text=True, shell=True)
+                            proc = subprocess.run(command, capture_output=True, text=True)
                             end_time = time.time()
                             duration = end_time - start_time
 
@@ -399,23 +398,21 @@ def main():
             for bucket_name, scripts in filtered_suites[args.suite].items():
                 print(f"  Bucket: {bucket_name}")
                 for script in scripts:
-                    # Build command with default + user args (same logic as run_scripts)
                     all_args = DEFAULT_SCRIPT_ARGS.copy()
                     if args.script_args:
-                        user_args = args.script_args.split()
+                        user_args = shlex.split(args.script_args)
                         all_args.extend(user_args)
-                    command = f"{script} {' '.join(all_args)}"
-                    print(f"    {command}")
+                    command = [script] + all_args
+                    print(f"    {shlex.join(command)}")
         else:
             print(f"  Bucket: {args.bucket}")
             for script in filtered_suites[args.suite][args.bucket]:
-                # Build command with default + user args (same logic as run_scripts)
                 all_args = DEFAULT_SCRIPT_ARGS.copy()
                 if args.script_args:
-                    user_args = args.script_args.split()
+                    user_args = shlex.split(args.script_args)
                     all_args.extend(user_args)
-                command = f"{script} {' '.join(all_args)}"
-                print(f"    {command}")
+                command = [script] + all_args
+                print(f"    {shlex.join(command)}")
     else:
         # Load failure keywords with priority: CLI args > config > defaults
         failure_keywords = None

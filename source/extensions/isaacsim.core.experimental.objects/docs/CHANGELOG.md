@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.8.1] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings.
+
+## [0.8.0] - 2026-03-10
+### Added
+- Add the `templates` parameter to GroundPlane to apply visual templates and set the default to `"wireframe-blue"`
+- Allow colors to be specified as case-insensitive string representations
+
+## [0.7.0] - 2026-03-04
+### Changed
+- Add Overview.md, python_api.md and updated docstrings
+
+## [0.6.0] - 2026-02-25
+### Added
+- Add USD `Camera`
+- Add the `colors` parameter to shape classes to set display colors
+
+## [0.5.0] - 2025-12-01
+### Changed
+- Define the `reset_xform_op_properties` parameter to True by default for all objects
+
 ## [0.4.0] - 2025-10-08
 ### Added
 - Add `GroundPlane` object
@@ -31,7 +53,7 @@
 
 ## [0.1.3] - 2025-05-23
 ### Changed
-- rename test utils.py to common.py
+- Rename test utils.py to common.py
 
 ## [0.1.2] - 2025-05-19
 ### Changed

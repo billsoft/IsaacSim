@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,12 +48,9 @@ jupyter kernelspec install ${kernel_dir}/jupyter_kernel --name isaac_sim_python3
 # Remove temp dir for kernel once installed
 rm -rf ${kernel_dir}
 
-# Check if we are running in a docker container
-if [ -f /.dockerenv ]; then
-  # Check for vulkan in docker container
-  if [[ -f "${SCRIPT_DIR}/vulkan_check.sh" ]]; then
-    ${SCRIPT_DIR}/vulkan_check.sh
-  fi
+# Check for vulkan when running in a docker container
+if [ -f /.dockerenv ] && [[ -f "${SCRIPT_DIR}/vulkan_check.sh" ]]; then
+  ${SCRIPT_DIR}/vulkan_check.sh
 fi
 
 # if the user provides the argument test as the first argument,

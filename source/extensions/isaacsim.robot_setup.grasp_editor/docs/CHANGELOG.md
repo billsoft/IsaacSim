@@ -1,4 +1,43 @@
 # Changelog
+
+## [2.3.3] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings, and update `python_api.md`.
+
+## [2.3.2] - 2026-05-12
+### Fixed
+- Wrong shape on forces/torques being added into the RigidBody during simulation.
+- Spelling mistakes corrected.
+
+## [2.3.1] - 2026-05-08
+### Fixed
+- Fixed silent failure of Skip Simulation -> Export Grasp; export state is preserved across internal timeline stops and errors are surfaced in the UI.
+- Updated user guide to use `object_frame` / `gripper_frame` field names, matching the actual `isaac_grasp` schema written by `DataWriter`.
+
+## [2.3.0] - 2026-03-16
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [2.2.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [2.1.3] - 2025-12-10
+### Fixed
+- Fixed Events 2.0 assets loaded and timeline play / stop events
+
+## [2.1.2] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [2.1.1] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [2.1.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [2.0.20] - 2025-10-08
 ### Fixed
 - Fix issue where rigid body was re-scaled
@@ -37,7 +76,7 @@
 
 ## [2.0.11] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [2.0.10] - 2025-04-09
 ### Changed

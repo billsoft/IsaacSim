@@ -1,5 +1,89 @@
 # Changelog
 
+## [2.6.8] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings.
+
+## [2.6.7] - 2026-05-21
+### Fixed
+- Make Leatherback `test_cameras` resilient to multitick-rendering publisher-discovery latency by extending `wait_for_publishers_on_topic` timeout and draining additional frames before sampling pixels.
+
+## [2.6.6] - 2026-05-18
+### Fixed
+- Improve Leatherback ROS2 test reliability by using ROS2TestCase helpers and waiting for ROS publishers, subscribers, and camera data.
+
+## [2.6.5] - 2026-05-01
+### Fixed
+- Fix test failures caused by timeline stopping and playing in the robot helpers
+
+## [2.6.4] - 2026-04-03
+### Changed
+- Adapt rotation test helpers to new `[roll, pitch, yaw]` euler angle input convention
+
+## [2.6.3] - 2026-03-26
+### Changed
+- Update the test dependencies to use the new experimental wheeled robots extension
+
+## [2.6.2] - 2026-03-22
+### Fixed
+- Fix carb.log_error call passing multiple arguments instead of a single formatted string
+
+## [2.6.1] - 2026-03-18
+### Changed
+- Update the test dependencies, as the core experimental extensions already depend on the `omni.kit.material.library`
+
+## [2.6.0] - 2026-03-12
+### Changed
+- Add test for environment golden images
+
+## [2.5.1] - 2026-03-07
+### Fixed
+- Add `omni.kit.material.library` as a test dependency so `CreateAndBindMdlMaterialFromLibrary` is available for material tests
+
+## [2.5.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [2.4.1] - 2026-02-05
+### Changed
+- Exclude NumPy module reload errors
+
+## [2.4.0] - 2026-02-04
+### Changed
+- Update dependencies to use new experimental extensions
+
+## [2.3.1] - 2026-02-02
+### Fixed
+- Add test for NaN issue in euler to quaternion conversion utils
+
+## [2.3.0] - 2026-01-27
+### Changed
+- Add test for euler to quaternion conversion utils
+
+## [2.2.7] - 2025-12-03
+### Changed
+- Remove TODOs.
+
+## [2.2.6] - 2025-11-28
+### Changed
+- Updated deprecated imports to isaacsim.storage.native
+
+## [2.2.5] - 2025-10-31
+### Changed
+- Update deprecated python unittest methods
+
+## [2.2.4] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [2.2.3] - 2025-10-18
+### Changed
+- Remove extra carb settings from tests
+
+## [2.2.2] - 2025-10-17
+### Removed
+- Remove commented code
+
 ## [2.2.1] - 2025-09-05
 ### Fixed
 - Fix test failure
@@ -62,7 +146,7 @@
 
 ## [2.0.12] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [2.0.11] - 2025-04-21
 ### Changed
@@ -70,7 +154,7 @@
 
 ## [2.0.10] - 2025-04-17
 ### Changed
-- changed add_update_semantics to add_labels
+- Changed add_update_semantics to add_labels
 
 ## [2.0.9] - 2025-04-09
 ### Changed
@@ -188,7 +272,7 @@
 
 ## [1.14.2] - 2023-11-27
 ### Fixed
-- updated tests to renamed nova carter asset
+- Updated tests to renamed nova carter asset
 
 ## [1.14.1] - 2023-11-21
 ### Added
@@ -262,11 +346,11 @@
 
 ## [1.5.0] - 2022-12-10
 ### Changed
-- use set_target_prims from core nodes
+- Use set_target_prims from core nodes
 
 ## [1.4.0] - 2022-11-18
 ### Added
-- cuopt example extension startup test
+- Cuopt example extension startup test
 
 ## [1.3.1] - 2022-10-27
 ### Fixed

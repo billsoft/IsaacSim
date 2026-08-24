@@ -1,5 +1,60 @@
 # Changelog
 
+## [1.9.3] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings, and update `python_api.md`.
+
+## [1.9.2] - 2026-05-04
+### Fixed
+- `path_join`: treat any URL-scheme path (including `file://`) as forward-slash on Windows
+- `path_join`: normalize backslashes in relative path components to forward slashes, fixing traversal failures when `omni.client.list` returns Windows-style paths on Nucleus/remote URLs
+
+## [1.9.1] - 2026-04-30
+### Fixed
+- `path_join` uses forward-slash concatenation for all URL schemes, not just `omniverse://`, fixing backslash-corrupted paths on Windows when the assets root is an `https://` URL
+- `path_join` `../` traversal uses `rsplit` instead of `os.path.dirname` to avoid the same backslash issue
+
+## [1.9.0] - 2026-04-02
+### Added
+- Support overriding the default asset root via the `ISAACSIM_ASSET_ROOT` environment variable
+
+## [1.8.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md, and SETTINGS.md and updated docstrings
+
+## [1.7.1] - 2026-03-02
+### Changed
+- Update assets path to 6.0 staging
+
+## [1.7.0] - 2026-02-13
+### Changed
+- Add retry attempts and retry base delay settings for asset root connectivity checks
+
+## [1.6.4] - 2026-01-09
+### Changed
+- Update assets path to development
+
+## [1.6.3] - 2025-12-07
+### Changed
+- Update description
+
+## [1.6.2] - 2025-12-06
+### Changed
+- Add missing docstrings
+- Add docstring tests
+
+## [1.6.1] - 2025-12-01
+### Fixed
+- Update assets path to 6.0 staging
+
+## [1.6.0] - 2025-11-26
+### Added
+- Added `resolve_asset_path` function to synchronously resolve asset paths with the same logic as the async variant.
+
+## [1.5.2] - 2025-11-05
+### Changed
+- Update assets path to development
+
 ## [1.5.1] - 2025-10-10
 ### Changed
 - Update assets path to production

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides AppFramework class for creating minimal Omniverse applications without application configuration."""
+
 import builtins
 import os
 import sys
@@ -22,9 +25,17 @@ import omni.kit.app
 
 
 class AppFramework:
-    """Minimal omniverse application that launches without any application config"""
+    """Minimal omniverse application that launches without any application config.
 
-    def __init__(self, name: str = "kit", argv=[]):
+    Args:
+        name: Name of the application.
+        argv: Command line arguments to pass to the application.
+    """
+
+    def __init__(self, name: str = "kit", argv: list[str] | None = None) -> None:
+
+        if argv is None:
+            argv = []
 
         builtins.ISAAC_LAUNCHED_FROM_TERMINAL = False
 
@@ -46,26 +57,28 @@ class AppFramework:
         self._app.startup(name, app_root, argv)
 
     def update(self) -> None:
-        """
-        Convenience function to step the application forward one frame
-        """
+        """Convenience function to step the application forward one frame."""
         self._app.update()
 
-    def close(self):
+    def close(self) -> None:
         """Close the running Omniverse Toolkit."""
         self._app.shutdown()
         self._framework.unload_all_plugins()
 
     @property
     def app(self) -> omni.kit.app.IApp:
-        """
-        omni.kit.app.IApp: omniverse kit application object
+        """Omniverse Kit application object.
+
+        Returns:
+            The omni.kit.app.IApp instance.
         """
         return self._app
 
     @property
     def framework(self) -> typing.Any:
-        """
-        omni.kit.app.IApp: omniverse kit application object
+        """Carb framework object.
+
+        Returns:
+            The Carb framework instance.
         """
         return self._framework

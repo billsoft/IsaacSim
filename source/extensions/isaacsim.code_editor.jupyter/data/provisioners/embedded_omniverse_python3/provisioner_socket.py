@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Socket-based kernel provisioner for embedded Omniverse Python."""
+
 import os
 import sys
-from typing import Any, List
+from typing import Any
 
 from jupyter_client.connect import KernelConnectionInfo
 from jupyter_client.launcher import launch_kernel
@@ -23,7 +25,18 @@ from jupyter_client.provisioning import LocalProvisioner
 
 
 class Provisioner(LocalProvisioner):
-    async def launch_kernel(self, cmd: List[str], **kwargs: Any) -> KernelConnectionInfo:
+    """Provision a kernel using a socket connection to the Omniverse runtime."""
+
+    async def launch_kernel(self, cmd: list[str], **kwargs: Any) -> KernelConnectionInfo:
+        """Launch the kernel process with the correct Python executable path.
+
+        Args:
+            cmd: Kernel launch command received from Jupyter.
+            **kwargs: Additional launch options passed to Jupyter's kernel launcher.
+
+        Returns:
+            Kernel connection information for the launched process.
+        """
         # set paths
         if sys.platform == "win32":
             cmd[0] = os.path.abspath(os.path.join(os.path.dirname(os.__file__), "..", "python.exe"))

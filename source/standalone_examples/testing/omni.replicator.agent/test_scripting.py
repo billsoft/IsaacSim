@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,35 +12,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import asyncio
+
+"""Verifies that the behavior scripting extension can apply the Omni scripting API schema to a newly created USD prim in a headless SimulationApp session."""
 
 from isaacsim import SimulationApp
 
-CONFIG = {"renderer": "RaytracedLighting", "headless": True, "width": 1920, "height": 1080}
+simulation_app = SimulationApp()
 
-if __name__ == "__main__":
-    app = SimulationApp(launch_config=CONFIG)
+import isaacsim.core.experimental.utils.app as app_utils
 
-    from isaacsim.core.utils.extensions import enable_extension
+simulation_app.update()
 
-    app.update()
+app_utils.enable_extension("omni.behavior.scripting.core")
 
-    enable_extension("omni.kit.scripting")
+import omni.usd
+from omni.behavior.scripting.core import ApplyScriptingAPICommand
+from pxr import OmniScriptingSchema
 
-    import omni.usd
-    from omni.kit.scripting import ApplyScriptingAPICommand
-    from pxr import OmniScriptingSchema
 
-    async def work():
+async def work() -> None:
+    """Create a prim and verify the scripting API is applied."""
+    # Create new prim and attach python scripting api.
+    await omni.usd.get_context().new_stage_async("tmp")
+    stage = omni.usd.get_context().get_stage()
+    stage.DefinePrim("/test")
+    ApplyScriptingAPICommand(paths=["/test"]).do()
 
-        # Create new prim and attach python scripting api.
-        await omni.usd.get_context().new_stage_async("tmp")
-        stage = omni.usd.get_context().get_stage()
-        stage.DefinePrim("/test")
-        ApplyScriptingAPICommand(paths=["/test"]).do()
+    # Test
+    prim = stage.GetPrimAtPath("/test")
+    assert prim.HasAPI(OmniScriptingSchema.OmniScriptingAPI)
 
-        # Test
-        prim = stage.GetPrimAtPath("/test")
-        assert prim.HasAPI(OmniScriptingSchema.OmniScriptingAPI)
 
-    asyncio.run(work())
+simulation_app.run_coroutine(work())
+
+simulation_app.close()

@@ -1,4 +1,26 @@
 # Changelog
+
+## [1.6.0] - 2026-04-09
+### Removed
+- Removed `set_next_simulation_time` API and `SWHExternalSimulationTime` event parameter. Multi-tick simulation time is now communicated via the `/ExternalSimulationTime` Fabric prim instead.
+
+## [1.5.1] - 2026-03-26
+### Changed
+- Moved Python binding module to `bindings/` subdirectory
+
+## [1.5.0] - 2026-03-04
+### Changed
+- Added python_api.md
+
+## [1.4.0] - 2026-02-03
+### Added
+- Added `set_next_simulation_time` function and Python binding to support multi-tick rendering mode
+- When `/rtx/hydra/supportMultiTickRate` is enabled, `SWHExternalSimulationTime` is passed to the run loop
+
+## [1.3.8] - 2025-10-17
+### Fixed
+- Issue where setting manual mode to false in the carb settings did not work if set before app startup completed
+
 ## [1.3.7] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 1.3.6)
@@ -76,7 +98,7 @@
 ## [1.0.0] - 2022-09-29
 ### Changed
 -   set_runner_dt to set_manual_step_size
--   setting the dt does not enable manual mode, need to call set_manual_mode(True)
+-   Setting the dt does not enable manual mode, need to call set_manual_mode(True)
 
 ### Added
 -   set_manual_mode to enable/disable manual dt during runtime.

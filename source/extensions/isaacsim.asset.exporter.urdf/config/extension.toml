@@ -1,25 +1,19 @@
 [package]
-version = "1.3.4"
+version = "2.0.5"
 category = "Simulation"
 title = "Isaac Sim USD to URDF exporter"
-description = "Extension that exports USD files to URDF"
+description = "Extension that exports USD articulated robots to URDF. UI is in isaacsim.asset.exporter.urdf.ui."
 keywords = ["isaac", "URDF"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
-writeTarget.platform = true # pip prebundle makes this extension os specific
 
 [dependencies]
-"isaacsim.core.deprecation_manager" = {}
-"isaacsim.core.utils" = {}
-"isaacsim.gui.components" = {}
-"omni.kit.pip_archive" = {}
-
-
-[[python.module]]
-path = "pip_prebundle"
+"isaacsim.asset.importer.utils" = {}
+"isaacsim.robot.schema" = {}
+"omni.physics.physx" = {}
 
 [[python.module]]
 name = "isaacsim.asset.exporter.urdf"
@@ -28,15 +22,29 @@ name = "isaacsim.asset.exporter.urdf"
 name = "isaacsim.asset.exporter.urdf.tests"
 
 [[test]]
+name = "startup"
+dependencies = [
+]
+
+[[test]]
 timeout = 400
-dependencies = [ "isaacsim.asset.importer.urdf", "isaacsim.core.experimental.prims"]
+dependencies = [
+    "isaacsim.asset.importer.urdf",
+    "isaacsim.core.experimental.utils",
+    "isaacsim.storage.native",
+    "isaacsim.test.utils"
+]
 stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
     "*Missing call to destroyResourceBindingSignature()*",
     '*not added to `TransformGraph` because it is not a link type or joint type prim.*',
     '*UserWarning: Sum of `faceVertexCounts` (392550) does not equal sum of length of `GeomSubset` `indices` (41287)*',
     '*Converted USD to URDF.*',
     '*Invalid Imu sensor prim*',
-    '*not added to `TransformGraph` because it is not a link type or joint type prim.*',
     '*parent prim is missing contact report API*',
-    '*Error processing node attribute `outputs:pointInstanceDataType`: dataType attribute is empty*'
+    '*Error processing node attribute `outputs:pointInstanceDataType`: dataType attribute is empty*',
+    '*SyntheticData extension needs at least a stageFrameHistoryCount of 3*'
 ]
+
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

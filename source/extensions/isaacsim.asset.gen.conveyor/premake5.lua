@@ -1,4 +1,4 @@
--- SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+-- SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,8 +16,6 @@
 local ext = get_current_extension_info()
 local ogn = get_ogn_project_information(ext, "isaacsim/asset/gen/conveyor")
 
--- Put this project into the omnigraph IDE group
-ext.group = "omnigraph"
 
 project_ext(ext)
 
@@ -34,6 +32,11 @@ includedirs {
     target_deps .. "/usd_ext_physics/%{cfg.buildcfg}/include",
     target_deps .. "/omni_physics/%{config}/include",
     target_deps .. "/omni_client_library/include",
+    -- usdrt headers + Fabric headers are required so that compute() can write
+    -- shader inputs:texture_translate into Fabric when Fabric Scene Delegate is enabled
+    target_deps .. "/rtx_plugins/include",
+    extsbuild_dir .. "/usdrt.scenegraph/include",
+    "%{kit_sdk_bin_dir}/dev/fabric/include/",
 }
 libdirs {
     target_deps .. "/usd/%{cfg.buildcfg}/lib",
@@ -44,10 +47,10 @@ libdirs {
 -- Linux-specific compile information
 filter { "system:linux" }
 exceptionhandling("On")
-removeflags { "FatalCompileWarnings", "UndefinedIdentifiers" }
+removeflags { "UndefinedIdentifiers" }
 includedirs {
     target_deps .. "/usd/%{config}/include/boost",
-    target_deps .. "/python/include/python3.11",
+    target_deps .. "/python/include/python3.12",
 }
 filter {}
 
@@ -56,7 +59,7 @@ add_ogn_dependencies(ogn)
 links { "physxSchema", "omni.usd" }
 
 -- Specifies the external libraries required by the nodes
-extra_usd_libs = { "usdGeom", "usdShade", "usdPhysics" }
+extra_usd_libs = { "usdGeom", "usdShade", "usdPhysics", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)

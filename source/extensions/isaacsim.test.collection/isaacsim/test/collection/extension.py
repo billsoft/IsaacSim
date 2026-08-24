@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,12 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test collection extension for Isaac Sim integration tests."""
+
 import omni.ext
 
 
 class Extension(omni.ext.IExt):
-    def on_startup(self, ext_id):
-        pass
+    """Test collection extension for Isaac Sim.
 
-    def on_shutdown(self):
-        pass
+    Provides a collection of integration tests for validating robot simulations,
+    physics behavior, and various Isaac Sim subsystems.
+    """
+
+    def on_startup(self, ext_id: str) -> None:
+        """Initialize the extension when it is loaded.
+
+        Args:
+            ext_id: Extension identifier provided by the extension manager.
+        """
+
+    def on_shutdown(self) -> None:
+        """Clean up resources when the extension is unloaded."""

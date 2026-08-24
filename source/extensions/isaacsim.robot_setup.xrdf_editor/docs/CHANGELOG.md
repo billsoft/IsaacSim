@@ -1,4 +1,78 @@
 # Changelog
+
+## [3.6.2] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings, and update `python_api.md`.
+
+## [3.6.1] - 2026-05-22
+### Changed
+- Info paragraphs to prioritize cuMotion over Lula.
+- Documentation link.
+
+### Fixed
+- `UIBuilder.on_stage_closed` was referencing the stage, causing a ValueError to be raised.
+
+## [3.6.0] - 2026-05-20
+### Changed
+- Decompose monolithic `extension.py` into focused modules.
+  - `xrdf_io.py` and `lula_io.py` expose pure, UI-free read/write/merge helpers (`write_xrdf_file`, `read_xrdf_file`, `is_valid_xrdf_file`, `merge_passthrough_dict`, `write_lula_robot_description_file`, `read_lula_robot_description_file`).
+  - `articulation_discovery.py` and `sphere_generation.py` hold the stage-graph algorithms previously embedded in the `Extension` class.
+  - `editor_state.py` provides a UI-free `EditorState` domain object that owns articulation data and high-level import/export operations; tests can use it directly without instantiating the UI.
+  - UI is split into per-panel modules under `ui/` (`InfoPanel`, `SelectionPanel`, `JointPropertiesPanel`, `SphereEditorPanel`, `EditorToolsPanel`).
+  - Magic strings and per-DOF default constants moved to `constants.py`.
+- Adopt the standard `isaacsim` UIBuilder pattern
+- Replace `sphere_generation.compute_link_frame_mesh` with `isaacsim.core.experimental.utils.xform.get_relative_transform`; removes the local `gf_quat_to_np_array` helper.
+- Per-DOF arrays now size exactly to the selected articulation's DOF count instead of using a fixed `MAX_DOF_NUM = 100` buffer.
+
+### Fixed
+- Exported XRDF does not contain mimic joints.
+
+## [3.5.0] - 2026-04-28
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [3.4.2] - 2026-03-06
+### Fixed
+- Clear physics subscription when window is hidden to stop per-physics-step callbacks while the panel is not visible
+
+## [3.4.1] - 2026-03-04
+### Fixed
+- Fix api errors
+- Removed incorrect type annotation for SimulationContext
+
+## [3.4.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [3.3.0] - 2026-02-26
+### Added
+- Can load and export XRDF version 2.0
+
+## [3.2.5] - 2025-12-08
+### Changed
+- Considers visual mesh scaling when generating collision spheres.
+- No longer deletes portions of the robot prim when generating collision spheres.
+
+## [3.2.4] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [3.2.3] - 2025-11-27
+### Changed
+- Add missing docstrings
+
+## [3.2.2] - 2025-10-31
+### Changed
+- Update deprecated numpy in1d to np.isin
+
+## [3.2.1] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [3.2.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [3.1.11] - 2025-07-14
 ### Added
 - Warning message when an existing XRDF file isn't valid for merging
@@ -13,7 +87,7 @@
 
 ## [3.1.8] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [3.1.7] - 2025-04-04
 ### Changed

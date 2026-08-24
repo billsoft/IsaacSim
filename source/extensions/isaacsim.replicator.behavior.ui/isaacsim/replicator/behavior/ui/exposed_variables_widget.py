@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,13 +13,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""A specialized USD property widget for displaying exposed variables from scripted prims."""
+
 import re
 
 from omni.kit.property.usd.usd_property_widget import UsdPropertiesWidget, UsdPropertyUiEntry
 
 
 class ExposedVariablesPropertyWidget(UsdPropertiesWidget):
-    def __init__(self, title: str, attribute_namespace_filter: list, collapsed: bool = False):
+    """A specialized USD property widget for displaying exposed variables from scripted prims.
+
+    This widget extends UsdPropertiesWidget to show only properties that match specific namespace filters,
+    typically used for displaying exposed variables from behavior scripts. It automatically organizes properties
+    into hierarchical groups based on their namespace structure and provides proper display formatting.
+
+    The widget filters properties by namespace prefixes and creates a structured UI layout with nested groups.
+    For properties with multiple namespace levels (e.g., 'exposedVar:locationRandomizer:includeChildren'),
+    it removes the filter namespace and creates nested display groups from the remaining parts.
+
+    When multiple prims are selected, properties are grouped by prim path to maintain clear organization.
+    The widget only displays properties from prims that have scripting enabled and contain actual scripts.
+
+    Args:
+        title: The title displayed for the property widget.
+        attribute_namespace_filter: List of namespace prefixes to include (e.g., ['exposedVar']).
+            Only properties starting with these namespaces will be displayed.
+        collapsed: Whether the widget should start in a collapsed state.
+    """
+
+    def __init__(self, title: str, attribute_namespace_filter: list, collapsed: bool = False) -> None:
         # Set multi_edit=False to handle each prim individually
         super().__init__(title, collapsed, multi_edit=False)
 
@@ -32,8 +54,15 @@ class ExposedVariablesPropertyWidget(UsdPropertiesWidget):
         # Initialize the multiple selection flag
         self._multiple_selection = False
 
-    def on_new_payload(self, payload):
-        """Handles new payloads to refresh UI or update models."""
+    def on_new_payload(self, payload: list) -> bool:
+        """Handle new payloads to refresh UI or update models.
+
+        Args:
+            payload: The new payload to be handled by the widget.
+
+        Returns:
+            True if valid properties were found and the widget should be built, False otherwise.
+        """
         if not super().on_new_payload(payload):
             return False
 
@@ -88,13 +117,27 @@ class ExposedVariablesPropertyWidget(UsdPropertiesWidget):
         # Do not create the widget if no valid properties found
         return bool(self._props_to_build)
 
-    def _get_shared_properties_from_selected_prims(self, anchor_prim):
-        """Override to provide properties for the base class's build_items()."""
+    def _get_shared_properties_from_selected_prims(self, anchor_prim: "Usd.Prim") -> list:
+        """Override to provide properties for the base class's build_items().
+
+        Args:
+            anchor_prim: The anchor prim used by the base class.
+
+        Returns:
+            The filtered UI property entries to be customized by _customize_props_layout.
+        """
         # Return only the filtered UI properties to _customize_props_layout
         return self._props_to_build
 
-    def _customize_props_layout(self, props):
-        """Customize the layout by setting display groups and names for properties."""
+    def _customize_props_layout(self, props: list) -> list:
+        """Customize the layout by setting display groups and names for properties.
+
+        Args:
+            props: The UI property entries to customize.
+
+        Returns:
+            The UI property entries with updated display groups and names to be built by the widget.
+        """
         # Iterate over the UI property entries and set the (nested) display group(s) and name
         for prop in props:
             # The display group has been previously set as the prim path
@@ -135,8 +178,15 @@ class ExposedVariablesPropertyWidget(UsdPropertiesWidget):
         # Return the UI property entries with the updated display groups and names to be built by the widget
         return props
 
-    def _make_capitalized_title(self, namespace_name):
-        """Convert names to 'Capitalized With Spaces' format."""
+    def _make_capitalized_title(self, namespace_name: str) -> str:
+        """Convert names to 'Capitalized With Spaces' format.
+
+        Args:
+            namespace_name: The namespace name to convert.
+
+        Returns:
+            The formatted title with proper capitalization and spacing.
+        """
         if "_" in namespace_name:
             return namespace_name.replace("_", " ").title()  # snake_case
         return re.sub(r"(?<!^)(?=[A-Z])", " ", namespace_name).title()  # camelCase or PascalCase

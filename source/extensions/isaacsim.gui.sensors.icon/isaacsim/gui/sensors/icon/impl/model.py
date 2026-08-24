@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,26 +12,64 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Sensor icon model for viewport scene management."""
+
 __all__ = ["IconModel"]
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Dict
 
 import carb
 import omni.kit.app
 import omni.usd
 import usdrt.Usd
 from omni.ui import scene as sc
-from pxr import Gf, Sdf, Tf, Trace, Usd, UsdGeom
+from pxr import Gf, Sdf, Trace, Usd, UsdGeom
 
 
 class IconModel(sc.AbstractManipulatorModel):
+    """Manages sensor icons within the viewport scene as manipulator items.
 
-    SENSOR_TYPES = ["Lidar", "OmniLidar", "IsaacContactSensor", "IsaacLightBeamSensor", "IsaacImuSensor", "Generic"]
+    This class automatically detects and visualizes sensor prims in the USD stage as interactive icons.
+    It monitors various sensor types including OmniLidar, IsaacContactSensor, IsaacImuSensor,
+    IsaacRaycastSensor, and deprecated types (Lidar, IsaacLightBeamSensor, Generic). The icons
+    are dynamically updated based on prim visibility, activation status, and stage changes.
+
+    The model maintains a persistent connection to both USD and USDRT stages for efficient querying
+    and real-time updates. Icons are positioned based on the sensor prim's world transform and respond
+    to stage events such as opening, closing, and frame updates.
+
+    Icon visibility is controlled by both the prim's USD visibility attribute and activation state.
+    The model provides methods to show, hide, add, and remove sensor icons programmatically, as well
+    as set click callbacks for interactive behavior.
+    """
+
+    SENSOR_TYPES = [
+        "OmniLidar",
+        "IsaacContactSensor",
+        "IsaacImuSensor",
+        "IsaacRaycastSensor",
+        # DEPRECATED types (kept for backward compatibility with existing scenes)
+        "Lidar",
+        "IsaacLightBeamSensor",
+        "Generic",
+    ]
+    """List of sensor type names that the icon model recognizes and displays icons for."""
 
     class IconItem(sc.AbstractManipulatorItem):
+        """Represents a sensor icon item in the 3D viewport.
 
-        def __init__(self, prim_path, icon_url):
+        This class encapsulates the visual representation of a sensor prim in Isaac Sim's 3D scene. Each IconItem
+        corresponds to a specific sensor prim and displays an icon at the sensor's location in the viewport. The
+        item tracks its visibility state, click handlers, and removal status for proper UI management.
+
+        Args:
+            prim_path: The USD prim path of the sensor.
+            icon_url: The file path or URL to the icon image to display for this sensor.
+        """
+
+        def __init__(self, prim_path: object, icon_url: str) -> None:
             super().__init__()
             self.icon_url = icon_url
             self.prim_path = prim_path
@@ -39,7 +77,7 @@ class IconModel(sc.AbstractManipulatorModel):
             self.removed = False
             self.visible = True
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._usd_listening_active = True
         self._sensor_icon_dir = omni.kit.app.get_app().get_extension_manager().get_extension_path_by_module(__name__)
@@ -69,7 +107,8 @@ class IconModel(sc.AbstractManipulatorModel):
 
         self._connect_to_stage()
 
-    def _connect_to_stage(self):
+    def _connect_to_stage(self) -> None:
+        """Connects the icon model to the current USD stage and initializes icon population."""
         stage = self._usd_context.get_stage()
         if stage:
             stage_id = self._usd_context.get_stage_id()
@@ -107,7 +146,7 @@ class IconModel(sc.AbstractManipulatorModel):
             self.clear()
 
     @Trace.TraceFunction
-    def _populate_initial_icons(self):
+    def _populate_initial_icons(self) -> None:
         """Populate icons by querying the USDrt stage. Skip if icon visibility is disabled."""
         # Do not populate any icons when global visibility is turned off.
         if not self._usd_listening_active:
@@ -155,38 +194,76 @@ class IconModel(sc.AbstractManipulatorModel):
 
         self._item_changed(None)
 
-    def _on_stage_opened(self, event):
+    def _on_stage_opened(self, event: object) -> None:
+        """Handles stage opened events by reconnecting to the new stage.
+
+        Args:
+            event: The stage opened event.
+        """
         self._connect_to_stage()
 
-    def _on_stage_closed(self, event):
+    def _on_stage_closed(self, event: object) -> None:
+        """Handles stage closed events by clearing icons and disconnecting from the stage.
+
+        Args:
+            event: The stage closed event.
+        """
         self.clear()
         self._usdrt_stage = None
 
-    def get_world_unit(self):
+    def get_world_unit(self) -> float:
+        """World unit scale for the current stage.
+
+        Returns:
+            The world unit scale, with a minimum value of 0.1.
+        """
         return max(self._world_unit, 0.1)
 
-    def __del__(self):
+    def __del__(self) -> None:
+        """Destructor that cleans up event subscriptions and destroys the model."""
         self._stage_open_sub = None
         self._stage_close_sub = None
         self._frame_sub = None
         self.destroy()
 
-    def destroy(self):
+    def destroy(self) -> None:
+        """Destroys the icon model and cleans up resources."""
         self._icons = {}
         if self._frame_sub:
             self._frame_sub = None
         self._hidden_paths.clear()
 
-    def get_item(self, identifier):
+    def get_item(self, identifier: object) -> IconItem | None:
+        """Icon item for the specified identifier.
+
+        Args:
+            identifier: Prim path as string or Sdf.Path to get the icon item for.
+
+        Returns:
+            IconItem | None: The IconItem instance, or None if not found.
+        """
         if isinstance(identifier, str):
             identifier = Sdf.Path(identifier)
         return self._icons.get(identifier)
 
-    def get_prim_paths(self):
+    def get_prim_paths(self) -> list[Sdf.Path]:
+        """Prim paths of all icons in the model.
+
+        Returns:
+            List of prim paths for all tracked icons.
+        """
         return list(self._icons.keys())
 
     @Trace.TraceFunction
-    def get_position(self, prim_path):
+    def get_position(self, prim_path: object) -> Gf.Vec3d | None:
+        """World position of the icon at the specified prim path.
+
+        Args:
+            prim_path: Path to the prim to get the position for.
+
+        Returns:
+            Gf.Vec3d | None: The world position as a 3D vector, or None if the position cannot be computed.
+        """
         if not isinstance(prim_path, Sdf.Path):
             prim_path = Sdf.Path(prim_path)
 
@@ -208,21 +285,44 @@ class IconModel(sc.AbstractManipulatorModel):
                     return None
         return None
 
-    def get_on_click(self, prim_path):
+    def get_on_click(self, prim_path: object) -> Callable | None:
+        """Gets the click callback function for a sensor icon.
+
+        Args:
+            prim_path: The USD prim path of the sensor.
+
+        Returns:
+            Callable | None: The click callback function if it exists, None otherwise.
+        """
         if not isinstance(prim_path, Sdf.Path):
             prim_path = Sdf.Path(prim_path)
         item = self._icons.get(prim_path)
         return item.on_click if item else None
 
-    def get_icon_url(self, prim_path):
+    def get_icon_url(self, prim_path: object) -> str:
+        """Gets the icon URL for a sensor icon.
+
+        Args:
+            prim_path: The USD prim path of the sensor.
+
+        Returns:
+            str: The icon URL if the sensor exists, empty string otherwise.
+        """
         if not isinstance(prim_path, Sdf.Path):
             prim_path = Sdf.Path(prim_path)
         item = self._icons.get(prim_path)
         return item.icon_url if item else ""
 
     @Trace.TraceFunction
-    def _on_frame_update(self, e):
+    def _on_frame_update(self, e: object) -> None:
+        """Updates sensor icon visibility and tracks sensor prims on each frame.
 
+        This method is called on every frame update to synchronize the icon model with the current USD stage state.
+        It detects new sensor prims, removes deleted ones, and updates visibility based on USD prim properties.
+
+        Args:
+            e: The frame update event.
+        """
         # Clear the transform cache so position queries are up-to-date.
         self._xform_cache = None
 
@@ -278,12 +378,19 @@ class IconModel(sc.AbstractManipulatorModel):
 
             self._item_changed(item)
 
-    def clear(self):
+    def clear(self) -> None:
+        """Clears all sensor icons from the model and notifies observers of the change."""
         if self._icons:
             self._icons = {}
             self._item_changed(None)
 
-    def add_sensor_icon(self, prim_path, icon_url=None):
+    def add_sensor_icon(self, prim_path: object, icon_url: str = None) -> None:
+        """Adds a sensor icon to the model if the prim is a recognized sensor type.
+
+        Args:
+            prim_path: The USD prim path of the sensor.
+            icon_url: The URL of the icon image. Uses default sensor icon if not provided.
+        """
         # Skip registering icons when visibility is disabled
         if not self._usd_listening_active:
             return
@@ -336,7 +443,12 @@ class IconModel(sc.AbstractManipulatorModel):
             self._icons[prim_path] = item
             self._item_changed(item)
 
-    def remove_sensor_icon(self, prim_path):
+    def remove_sensor_icon(self, prim_path: object) -> None:
+        """Removes a sensor icon from the model and marks the path as hidden.
+
+        Args:
+            prim_path: The USD prim path of the sensor to remove.
+        """
         if not isinstance(prim_path, Sdf.Path):
             prim_path = Sdf.Path(prim_path)
 
@@ -347,7 +459,13 @@ class IconModel(sc.AbstractManipulatorModel):
             # Mark as hidden
             self._hidden_paths.add(prim_path)
 
-    def set_icon_click_fn(self, prim_path, call_back):
+    def set_icon_click_fn(self, prim_path: object, call_back: callable) -> None:
+        """Sets the click callback function for a sensor icon.
+
+        Args:
+            prim_path: The USD prim path of the sensor.
+            call_back: The callback function to execute when the icon is clicked.
+        """
         if not isinstance(prim_path, Sdf.Path):
             prim_path = Sdf.Path(prim_path)
         item = self._icons.get(prim_path)
@@ -355,8 +473,12 @@ class IconModel(sc.AbstractManipulatorModel):
             item.on_click = call_back
 
     @Trace.TraceFunction
-    def show_sensor_icon(self, prim_path):
-        """Show a sensor icon by setting the USD prim visibility to visible and immediately updating internal state."""
+    def show_sensor_icon(self, prim_path: object) -> None:
+        """Show a sensor icon by setting the USD prim visibility to visible and immediately updating internal state.
+
+        Args:
+            prim_path: The USD prim path of the sensor to show.
+        """
         if not isinstance(prim_path, Sdf.Path):
             prim_path = Sdf.Path(prim_path)
 
@@ -372,8 +494,12 @@ class IconModel(sc.AbstractManipulatorModel):
             item.visible = True
             self._item_changed(item)
 
-    def hide_sensor_icon(self, prim_path):
-        """Hide a sensor icon by setting the USD prim visibility to invisible and immediately updating internal state."""
+    def hide_sensor_icon(self, prim_path: object) -> None:
+        """Hide a sensor icon by setting the USD prim visibility to invisible and immediately updating internal state.
+
+        Args:
+            prim_path: The USD prim path of the sensor to hide.
+        """
         if not isinstance(prim_path, Sdf.Path):
             prim_path = Sdf.Path(prim_path)
 
@@ -389,7 +515,8 @@ class IconModel(sc.AbstractManipulatorModel):
             item.visible = False
             self._item_changed(item)
 
-    def show_all(self):
+    def show_all(self) -> None:
+        """Shows all sensor icons by activating USD listening and repopulating icons from the current stage state."""
         # Activate USD listening
         self._usd_listening_active = True
 
@@ -405,9 +532,11 @@ class IconModel(sc.AbstractManipulatorModel):
         # Refresh all icons from the current USD state
         self._populate_initial_icons()
 
-    def hide_all(self):
+    def hide_all(self) -> None:
+        """Hides all sensor icons by deactivating USD listening and clearing the icon model."""
         # Deactivate USD listening
         self._usd_listening_active = False
+        self._frame_sub = None
 
         # Forcefully clear all icons from the model
         if self._icons:
@@ -415,7 +544,7 @@ class IconModel(sc.AbstractManipulatorModel):
             self._item_changed(None)
 
     @Trace.TraceFunction
-    def refresh_all_icon_visuals(self):
+    def refresh_all_icon_visuals(self) -> None:
         """Force a refresh notification for all currently tracked icon items."""
         if not self._usd_listening_active:
             return

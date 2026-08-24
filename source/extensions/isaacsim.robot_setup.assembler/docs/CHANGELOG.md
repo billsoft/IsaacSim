@@ -1,4 +1,55 @@
 # Changelog
+
+## [3.3.3] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings, and update `python_api.md`.
+
+## [3.3.2] - 2026-05-12
+### Changed
+- Made `assemble_rigid_bodies` and `create_fixed_joint` private (`_assemble_rigid_bodies`, `_create_fixed_joint`)
+- Added Python type annotations across module, UI, and tests
+- `RobotAssembler.__del__` no longer calls `reset()`/`cancel_assembly()`; finalizers must not touch USD or schedule coroutines because the event loop and `omni.usd` context may already be torn down. Callers needing in-flight teardown must invoke `reset()` explicitly.
+- Variant payloads written by `RobotAssembler.begin_assembly` / `finish_assemble` are now stored under `payloads/<variant_set>/<variant_name>.usd` (relative to the base robot asset) instead of `configuration/<variant_set>_<variant_name>.usd`. The variant-set name now acts as a subdirectory rather than a filename prefix, and the source asset's stem is no longer prepended in direct-edit mode. The destination directory is created automatically when assembling directly on the source asset.
+
+### Fixed
+- `RobotAssembler.cancel_assembly()` no longer raises `AttributeError: 'RobotAssembler' object has no attribute '_assembly_identifier'` when called on a fresh instance or before `begin_assembly()`. `reset()` now initializes the assembly sublayer state (`_assembly_identifier`, `_local_assembly_identifier`, `_assembly_layer`, `_direct_edit`, `_variant_set`, `_variant_name`) so the cancellation guard clause is safe to evaluate at any time. Covered by `test_robot_assembler_cancel_on_idle_instance_is_noop`.
+
+## [3.3.1] - 2026-03-06
+### Fixed
+- Clear assets-loaded and physics subscriptions when window is hidden to avoid callbacks running while the panel is not visible
+
+## [3.3.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [3.2.0] - 2025-12-16
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [3.1.5] - 2025-12-16
+### Changed
+- Consume Asset Changed events for UI update
+
+## [3.1.4] - 2025-12-15
+### Changed
+- Fix event name usage.
+
+## [3.1.3] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [3.1.2] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [3.1.1] - 2025-10-18
+### Changed
+- Remove extra carb settings from tests
+
+## [3.1.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [3.0.11] - 2025-10-01
 ### Fixed
 - Issues with scenegraph instancing when fabric is disabled
@@ -62,7 +113,7 @@
 
 ## [2.1.12] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [2.1.11] - 2025-04-09
 ### Changed

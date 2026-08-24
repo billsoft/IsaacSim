@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,44 +13,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Comprehensive tests for TimeSampleStorage functionality through the SimulationManager interface.
-Tests validate monotonic behavior, buffer management, and thread safety.
-"""
+"""Verifies SimulationManager time sample storage through monotonic sampling, interpolation, range queries, logging, and structured access. The tests cover buffer overflow, high-frequency stepping, stop-play behavior, pause-resume behavior, and stored-time lookups."""
 
-import asyncio
-import time
+from typing import Any
 
 import carb
+import omni.kit.app
 import omni.kit.test
 import omni.timeline
+from isaacsim.core.experimental.utils.stage import create_new_stage_async, get_current_stage
 from isaacsim.core.simulation_manager import SimulationManager
-from isaacsim.core.utils.stage import create_new_stage_async, get_current_stage, update_stage_async
 
 
 class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
+    """Test time sample storage."""
 
-    async def setUp(self):
+    async def setUp(self) -> None:
         """Set up test environment."""
         super().setUp()
         await create_new_stage_async()
         # Set stage FPS to match carb setting for deterministic time sample testing
         settings = carb.settings.get_settings()
         sim_period_denom = settings.get("/app/settings/fabricDefaultSimPeriodDenominator") or 60
-        get_current_stage().SetTimeCodesPerSecond(sim_period_denom)
-        await update_stage_async()
+        get_current_stage(backend="usd").SetTimeCodesPerSecond(sim_period_denom)
+        # Set physics dt to 1/60 for consistent timestep across engines
+        SimulationManager.set_physics_dt(1.0 / 60.0)
+        await omni.kit.app.get_app().next_update_async()
 
-    async def tearDown(self):
+    async def tearDown(self) -> None:
         """Clean up after test."""
         timeline = omni.timeline.get_timeline_interface()
         timeline.stop()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         super().tearDown()
 
-    def _verify_samples_monotonic(self, samples, message="Samples should be monotonic"):
-        """
-        Manually verify that samples are monotonically increasing in time.
+    def _verify_samples_monotonic(self, samples: Any, message: Any = "Samples should be monotonic") -> None:
+        """Manually verify that samples are monotonically increasing in time.
+
         This replaces the removed validateSamplesMonotonic C++ function.
+
+        Args:
+            samples: Time sample entries to validate.
+            message: Assertion message prefix to use when monotonicity checks fail.
         """
         for i in range(1, len(samples)):
             prev_entry = samples[i - 1]
@@ -72,7 +76,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
                 f"{message}: Monotonic sim time not monotonic at sample {i}",
             )
 
-    async def test_time_samples_monotonic_increase(self):
+    async def test_time_samples_monotonic_increase(self) -> None:
         """Test that stored samples are monotonically increasing."""
         timeline = omni.timeline.get_timeline_interface()
 
@@ -82,7 +86,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # Start simulation and let it run
         timeline.play()
         for _ in range(10):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         # Should now have samples
         sample_count = SimulationManager._simulation_manager_interface.get_sample_count()
@@ -112,7 +116,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
             self.assertTrue(prev_entry.valid, f"Sample {i-1} should be valid")
             self.assertTrue(curr_entry.valid, f"Sample {i} should be valid")
 
-    async def test_high_frequency_simulation_buffer_behavior(self):
+    async def test_high_frequency_simulation_buffer_behavior(self) -> None:
         """Test high write rate doesn't cause issues and buffer behaves correctly."""
         SimulationManager.set_physics_dt(1 / 1000)  # Physics at 1000 Hz
         timeline = omni.timeline.get_timeline_interface()
@@ -124,7 +128,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # Run simulation for many steps (more than buffer capacity)
         buffer_capacity = SimulationManager._simulation_manager_interface.get_buffer_capacity()
         for step in range(buffer_capacity + 40):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
             # Capture current frame time every few steps
             if step % 5 == 0:
@@ -182,14 +186,14 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
             # Note: This may be None if the sample was evicted from the circular buffer
             # That's expected behavior for very old samples beyond buffer capacity
 
-    async def test_stop_play_behavior(self):
+    async def test_stop_play_behavior(self) -> None:
         """Test behavior during stop/play cycles."""
         timeline = omni.timeline.get_timeline_interface()
 
         # Start simulation
         timeline.play()
         for _ in range(5):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples_after_play = SimulationManager._simulation_manager_interface.get_all_samples()
         count_after_play = len(samples_after_play)
@@ -208,7 +212,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
 
         # Stop simulation
         timeline.stop()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
 
         # Storage should be cleared on stop
         count_after_stop = SimulationManager._simulation_manager_interface.get_sample_count()
@@ -221,21 +225,21 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # Start again
         timeline.play()
         for _ in range(5):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples_after_restart = SimulationManager._simulation_manager_interface.get_all_samples()
         count_after_restart = len(samples_after_restart)
         self.assertGreater(count_after_restart, 0)
         self._verify_samples_monotonic(samples_after_restart)
 
-    async def test_pause_resume_behavior(self):
+    async def test_pause_resume_behavior(self) -> None:
         """Test that pause/resume doesn't break sample consistency."""
         timeline = omni.timeline.get_timeline_interface()
 
         # Start and run
         timeline.play()
         for _ in range(5):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples_before_pause = SimulationManager._simulation_manager_interface.get_all_samples()
         count_before_pause = len(samples_before_pause)
@@ -243,7 +247,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
 
         # Pause
         timeline.pause()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
 
         # Sample count shouldn't change during pause
         count_during_pause = SimulationManager._simulation_manager_interface.get_sample_count()
@@ -254,7 +258,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # Resume and continue
         timeline.play()
         for _ in range(5):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples_after_resume = SimulationManager._simulation_manager_interface.get_all_samples()
         SimulationManager._simulation_manager_interface.log_statistics()
@@ -262,14 +266,14 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         self.assertGreater(count_after_resume, count_before_pause)
         self._verify_samples_monotonic(samples_after_resume)
 
-    async def test_interpolation_with_stored_samples(self):
+    async def test_interpolation_with_stored_samples(self) -> None:
         """Test interpolation using actual stored samples."""
         timeline = omni.timeline.get_timeline_interface()
         timeline.play()
 
         # Run simulation to get some samples
         for _ in range(20):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples = SimulationManager._simulation_manager_interface.get_all_samples()
 
@@ -302,22 +306,24 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         self.assertGreaterEqual(interpolated_sim_time, first_sim_time)
         self.assertLessEqual(interpolated_sim_time, last_sim_time)
 
-    async def test_time_sample_range(self):
+    async def test_time_sample_range(self) -> None:
         """Test time sample range functionality."""
         # Should be None when empty
         self.assertIsNone(SimulationManager._simulation_manager_interface.get_sample_range())
 
         timeline = omni.timeline.get_timeline_interface()
         timeline.play()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
 
-        # Get sim period setting to determine number of frames for 1-second test
-        settings = carb.settings.get_settings()
-        sim_period_denom = settings.get("/app/settings/fabricDefaultSimPeriodDenominator") or 60
-        num_frames = sim_period_denom  # Run for 1 second worth of frames
+        # Run enough frames to accumulate a meaningful time range but stay
+        # within the circular buffer capacity so no samples are evicted.
+        physics_fps = 60
+        expected_frame_delta = 1.0 / physics_fps
+        buffer_capacity = SimulationManager._simulation_manager_interface.get_buffer_capacity()
+        num_frames = buffer_capacity - 5
 
         for f in range(num_frames):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         # Should have range now
         time_range = SimulationManager._simulation_manager_interface.get_sample_range()
@@ -330,12 +336,19 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         self.assertLess(
             earliest_seconds,
             latest_seconds,
-            "Latest time {} should be greater than earliest {}".format(latest_seconds, earliest_seconds),
+            f"Latest time {latest_seconds} should be greater than earliest {earliest_seconds}",
         )
 
-        # Get the sim period denominator from carb settings to calculate expected timing
-        expected_total_delta = num_frames / sim_period_denom  # num_frames / FPS = 1 second
-        expected_sim_total_delta = num_frames / 60.0  # 60 FPS
+        # Verify range matches actual samples
+        samples = SimulationManager._simulation_manager_interface.get_all_samples()
+        self.assertGreater(len(samples), 1, "Should have multiple samples")
+
+        first_sample_time = samples[0].time.to_float()
+        last_sample_time = samples[-1].time.to_float()
+
+        # Derive the expected total delta from the actual number of stored
+        # samples (each consecutive pair is one physics step apart).
+        expected_total_delta = (len(samples) - 1) * expected_frame_delta
 
         # Verify range delta matches expected timing
         time_delta = latest_seconds - earliest_seconds
@@ -343,19 +356,10 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
             time_delta,
             expected_total_delta,
             places=2,
-            msg="Time range {} - {} should span {} seconds for {} FPS".format(
-                earliest_seconds, latest_seconds, expected_total_delta, sim_period_denom
-            ),
+            msg=f"Time range {earliest_seconds:.4f} - {latest_seconds:.4f} ({len(samples)} samples) should span {expected_total_delta:.4f}s",
         )
 
-        # Verify range matches actual samples
-        samples = SimulationManager._simulation_manager_interface.get_all_samples()
-        first_sample_time = samples[0].time.to_float()
-        last_sample_time = samples[-1].time.to_float()
-
-        # Verify delta between consecutive samples matches sim period
-        expected_frame_delta = 1.0 / sim_period_denom
-        expected_sim_frame_delta = 1.0 / 60.0
+        # Verify delta between consecutive samples matches physics dt
         for i in range(1, len(samples)):
             prev_time = samples[i - 1].time.to_float()
             curr_time = samples[i].time.to_float()
@@ -364,18 +368,17 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
                 actual_delta,
                 expected_frame_delta,
                 places=4,
-                msg=f"Frame {i} delta should be ~{expected_frame_delta:.4f}s (1/{sim_period_denom} FPS), got {actual_delta:.4f}s",
+                msg=f"Frame {i} time delta should be ~{expected_frame_delta:.4f}s (1/{physics_fps}), got {actual_delta:.4f}s",
             )
 
-            # Also check simulation time deltas, these will be different due to physics dt which is 1/60s
             prev_sim_time = samples[i - 1].data.sim_time
             curr_sim_time = samples[i].data.sim_time
             sim_delta = curr_sim_time - prev_sim_time
             self.assertAlmostEqual(
                 sim_delta,
-                expected_sim_frame_delta,
+                expected_frame_delta,
                 places=4,
-                msg=f"Simulation time delta for frame {i} should be ~{expected_sim_frame_delta:.4f}s (1/{60} FPS), got {sim_delta:.4f}s",
+                msg=f"Frame {i} sim_time delta should be ~{expected_frame_delta:.4f}s (1/{physics_fps}), got {sim_delta:.4f}s",
             )
 
         self.assertAlmostEqual(earliest_seconds, first_sample_time, places=6)
@@ -387,12 +390,12 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         sim_time_delta = last_sample_sim_time - first_sample_sim_time
         self.assertAlmostEqual(
             sim_time_delta,
-            expected_sim_total_delta,
+            expected_total_delta,
             places=2,
-            msg=f"Simulation time should span {expected_sim_total_delta} seconds for {sim_period_denom} FPS",
+            msg=f"Simulation time should span {expected_total_delta:.4f}s ({len(samples)} samples)",
         )
 
-    async def test_logging_functionality(self):
+    async def test_logging_functionality(self) -> None:
         """Test that logging doesn't crash and works with different storage states."""
         # Should work when empty
         SimulationManager._simulation_manager_interface.log_statistics()
@@ -401,25 +404,25 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         timeline.play()
         print("Playing timeline")
         for _ in range(10):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
         print("Done playing timeline")
         # Should work with samples
         SimulationManager._simulation_manager_interface.log_statistics()
 
         # Should work after stop (when cleared)
         timeline.stop()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         print("Stopped")
         SimulationManager._simulation_manager_interface.log_statistics()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
 
-    async def test_structured_data_access(self):
+    async def test_structured_data_access(self) -> None:
         """Test that the Entry and TimeData objects work correctly."""
         timeline = omni.timeline.get_timeline_interface()
         timeline.play()
 
         for _ in range(5):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples = SimulationManager._simulation_manager_interface.get_all_samples()
         self.assertGreater(len(samples), 0)
@@ -442,7 +445,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
             # Test valid flag
             self.assertTrue(sample.valid, f"Sample {i} should be valid")
 
-    async def test_buffer_overflow_oldest_eviction(self):
+    async def test_buffer_overflow_oldest_eviction(self) -> None:
         """Test that buffer overflow correctly evicts oldest samples."""
         timeline = omni.timeline.get_timeline_interface()
         timeline.play()
@@ -450,7 +453,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # Run for exactly buffer capacity + some extra
         buffer_capacity = SimulationManager._simulation_manager_interface.get_buffer_capacity()
         for _ in range(buffer_capacity + 10):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples = SimulationManager._simulation_manager_interface.get_all_samples()
         sample_count = len(samples)
@@ -465,12 +468,12 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # (we can't easily test this without knowing exact timing,
         #  but the monotonic check verifies basic correctness)
 
-    async def test_get_simulation_time_at_time(self):
+    async def test_get_simulation_time_at_time(self) -> None:
         """Test that get_simulation_time_at_time works correctly."""
         invalid_time = SimulationManager._simulation_manager_interface.get_simulation_time_at_time((0, 0))
         self.assertAlmostEqual(invalid_time, 0.0)
         timeline = omni.timeline.get_timeline_interface()
         timeline.play()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         invalid_time = SimulationManager._simulation_manager_interface.get_simulation_time_at_time((0, 0))
         self.assertAlmostEqual(invalid_time, 3 * 1 / 60)  # two initial steps done during play + 1 more step

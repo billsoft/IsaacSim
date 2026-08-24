@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,40 +13,49 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test to verify that viewport rendering callbacks are triggered on the first frame."""
+"""Verifies that a viewport NEW_FRAME rendering event is delivered on the first SimulationApp update, with bounded waiting before shutdown if the callback is delayed."""
 
+import argparse
 import sys
 import time
+from typing import Any
 
+parser = argparse.ArgumentParser(description="Script to test viewport ready")
+parser.add_argument(
+    "--silent",
+    action="store_true",
+    default=False,
+    help="Silent mode (default: False)",
+)
+_ARGS, _ = parser.parse_known_args()
 from isaacsim import SimulationApp
 
 # Create simulation app
 kit = SimulationApp({"headless": False})
 
 
+import carb.eventdispatcher
 import omni
+import omni.usd
 
 # Track if callback was called
 callback_called = False
 
 
-def data_acquisition_callback(event):
+def data_acquisition_callback(event: Any) -> None:
     """Callback function triggered on rendering events."""
     global callback_called
-    print(f"Received render event: {event.type}")
+    print(f"Received render event: {event.event_name}")
     callback_called = True
 
 
 # Subscribe to NEW_FRAME rendering events
-data_callback = (
-    omni.usd.get_context()
-    .get_rendering_event_stream()
-    .create_subscription_to_pop_by_type(
-        int(omni.usd.StageRenderingEventType.NEW_FRAME),
-        data_acquisition_callback,
-        name="test_viewport_ready.acquisition_callback",
-        order=0,
-    )
+usd_context = omni.usd.get_context()
+data_callback = carb.eventdispatcher.get_eventdispatcher().observe_event(
+    event_name=usd_context.stage_rendering_event_name(omni.usd.StageRenderingEventType.NEW_FRAME, True),
+    on_event=data_acquisition_callback,
+    observer_name="test_viewport_ready.acquisition_callback",
+    order=0,
 )
 
 try:
@@ -55,21 +64,26 @@ try:
 
     # Check if callback was called on first frame
     if not callback_called:
-        print("ERROR: Rendering callback was not called on the first frame")
+        if not _ARGS.silent:
+            print("[error] Rendering callback was not called on the first frame")
 
         # Wait for viewport to be ready before exiting to prevent app hang
         max_wait_frames = 100
         for i in range(max_wait_frames):
-            print(f"Waiting for viewport to be ready before exiting... frame {i}")
+            if not _ARGS.silent:
+                print(f"Waiting for viewport to be ready before exiting... frame {i}")
             kit.update()
             time.sleep(0.02)
             if callback_called:
                 break
 
-        sys.exit(1)
+        if not _ARGS.silent:
+            sys.exit(1)
 
-    print("SUCCESS: Rendering callback was called on the first frame")
+    if not _ARGS.silent:
+        print("SUCCESS: Rendering callback was called on the first frame")
 
 finally:
     # Cleanup
+    data_callback = None
     kit.close()

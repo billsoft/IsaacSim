@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2022-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-FileCopyrightText: Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,15 +19,6 @@
 
 CARB_BINDINGS("isaacsim.ros2.tf_viewer")
 
-namespace isaacsim
-{
-namespace ros2
-{
-namespace tf_viewer
-{
-} // namespace tf_viewer
-} // namespace ros2
-} // namespace isaacsim
 
 namespace py = pybind11;
 

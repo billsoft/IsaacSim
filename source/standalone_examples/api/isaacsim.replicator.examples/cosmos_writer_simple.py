@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,11 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Demonstrate synthetic data generation using the CosmosWriter."""
+
 from isaacsim import SimulationApp
 
 simulation_app = SimulationApp(launch_config={"headless": False})
 
 import os
+from typing import Any
 
 import carb.settings
 import omni.replicator.core as rep
@@ -32,7 +35,8 @@ SEGMENTATION_MAPPING = {
 NUM_FRAMES = 60
 
 
-def run_cosmos_example(num_frames, segmentation_mapping=None):
+def run_cosmos_example(num_frames: int, segmentation_mapping: dict[str, Any] | None = None) -> None:
+    """Run a CosmosWriter example capturing physics simulation frames."""
     # Create a new stage
     omni.usd.get_context().new_stage()
 
@@ -67,8 +71,10 @@ def run_cosmos_example(num_frames, segmentation_mapping=None):
     rp = rep.create.render_product(camera, (1280, 720))
     out_dir = os.path.join(os.getcwd(), "_out_cosmos_simple")
     print(f"Output directory: {out_dir}")
+    backend = rep.backends.get("DiskBackend")
+    backend.initialize(output_dir=out_dir)
     cosmos_writer = rep.WriterRegistry.get("CosmosWriter")
-    cosmos_writer.initialize(output_dir=out_dir, segmentation_mapping=segmentation_mapping)
+    cosmos_writer.initialize(backend=backend, segmentation_mapping=segmentation_mapping)
     cosmos_writer.attach(rp)
 
     # Start the simulation
@@ -90,5 +96,39 @@ def run_cosmos_example(num_frames, segmentation_mapping=None):
 
 
 run_cosmos_example(num_frames=NUM_FRAMES, segmentation_mapping=SEGMENTATION_MAPPING)
+
+# <start-cosmos-writer-simple-test>
+import argparse
+import sys
+
+from isaacsim.core.utils.extensions import enable_extension
+
+enable_extension("isaacsim.test.utils")
+from isaacsim.test.utils.file_validation import validate_folder_contents
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--test",
+    action="store_true",
+    help="Validate captured output files against expected counts and exit.",
+)
+args, _ = parser.parse_known_args()
+
+if args.test:
+    # CosmosWriter writes one PNG per frame and one MP4 video per modality
+    # (rgb, shaded_seg, segmentation, depth, edges) under clip_0000/.
+    out_dir = os.path.join(os.getcwd(), "_out_cosmos_simple")
+    num_modalities = 5
+    ok = validate_folder_contents(
+        path=out_dir,
+        recursive=True,
+        expected_counts={"png": NUM_FRAMES * num_modalities, "mp4": num_modalities},
+        fail_on_empty_files=True,
+    )
+    if not ok:
+        print(f"[SDG][Test][FAIL] Output validation failed for {out_dir}")
+        sys.exit(1)
+    print(f"[SDG][Test][PASS] Output validation succeeded for {out_dir}")
+# <end-cosmos-writer-simple-test>
 
 simulation_app.close()

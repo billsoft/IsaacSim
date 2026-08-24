@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""High level class for creating/wrapping USD Cube (primitive rectilinear cube centered at the origin) prims."""
 
 from __future__ import annotations
 
@@ -40,6 +42,10 @@ class Cube(Shape):
             Can include regular expressions for matching multiple prims.
         sizes: Sizes (cube's edge length) (shape ``(N, 1)``).
             If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
+        colors: Normalized RGB display colors (shape ``(N, 3)``) or case-insensitive string representations.
+            Supported string representations include hex codes and X11/CSS4 color names without spaces,
+            as well as any other format supported by Matplotlib. Alpha channel is ignored for string representations.
+            If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
         positions: Positions in the world frame (shape ``(N, 3)``).
             If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
         translations: Translations in the local frame (shape ``(N, 3)``).
@@ -53,6 +59,7 @@ class Cube(Shape):
 
     Raises:
         ValueError: If resulting paths are mixed (existing and non-existing prims) or invalid.
+        ValueError: Invalid string representation format for the colors.
         AssertionError: If wrapped prims are not USD Cube.
         AssertionError: If both positions and translations are specified.
 
@@ -63,9 +70,9 @@ class Cube(Shape):
         >>> from isaacsim.core.experimental.objects import Cube
         >>>
         >>> # given an empty USD stage with the /World Xform prim,
-        >>> # create cubes at paths: /World/prim_0, /World/prim_1, and /World/prim_2
+        >>> # create blue cubes at paths: /World/prim_0, /World/prim_1, and /World/prim_2
         >>> paths = ["/World/prim_0", "/World/prim_1", "/World/prim_2"]
-        >>> prims = Cube(paths)  # doctest: +NO_CHECK
+        >>> prims = Cube(paths, colors="#0000ff")  # doctest: +NO_CHECK
     """
 
     def __init__(
@@ -74,12 +81,14 @@ class Cube(Shape):
         *,
         # Cube
         sizes: float | list | np.ndarray | wp.array | None = None,
+        # Shape
+        colors: str | list | np.ndarray | wp.array | None = None,
         # XformPrim
         positions: list | np.ndarray | wp.array | None = None,
         translations: list | np.ndarray | wp.array | None = None,
         orientations: list | np.ndarray | wp.array | None = None,
         scales: list | np.ndarray | wp.array | None = None,
-        reset_xform_op_properties: bool = False,
+        reset_xform_op_properties: bool = True,
     ) -> None:
         self._geoms = []
         stage = stage_utils.get_current_stage(backend="usd")
@@ -100,6 +109,7 @@ class Cube(Shape):
         super().__init__(
             paths,
             resolve_paths=False,
+            colors=colors,
             positions=positions,
             translations=translations,
             orientations=orientations,
@@ -130,7 +140,7 @@ class Cube(Shape):
 
     @staticmethod
     def are_of_type(paths: str | Usd.Prim | list[str | Usd.Prim]) -> wp.array:
-        """Check if the prims at the given paths are valid for creating Shape instances of this type.
+        """Check if the prims at the given paths are valid for creating Cube instances of this type.
 
         Backends: :guilabel:`usd`.
 
@@ -142,7 +152,7 @@ class Cube(Shape):
             paths: Prim paths (or prims) to check for.
 
         Returns:
-            Boolean flags indicating if the prims are valid for creating Shape instances.
+            Boolean flags indicating if the prims are valid for creating Cube instances.
 
         Example:
 

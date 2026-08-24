@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,13 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Style configuration module for the robot gain tuner UI extension."""
+
 import pathlib
 
-import carb.settings
 import omni
 import omni.kit.app
-import omni.ui as ui
-from omni.kit.window.extensions.common import get_icons_path
 from omni.ui import color as cl
 
 EXTENSION_FOLDER_PATH = pathlib.Path(
@@ -38,6 +37,7 @@ UNIT_COLOR = 0xFF6E6E6E
 LINE_COLOR = 0xFF8F8F8F
 TRIANGLE_COLOR = 0xFF8F8F8F
 TREEVIEW_BG_COLOR = 0xFF23211F
+TREEVIEW_INAPPLICABLE_BG_COLOR = 0xFF3A3937
 TREEVIEW_SELECTED_COLOR = 0xFF4B4A42
 TREEVIEW_ITEM_COLOR = 0xFF343432
 TREEVIEW_HEADER_BG_COLOR = 0xFF2D2D2D
@@ -46,7 +46,16 @@ HEADER_FONT_SIZE = 16
 FONT_SIZE = 14
 
 
-def get_style():
+def get_style() -> dict[str, dict[str, any]]:
+    """UI style configuration for the robot gain tuner extension.
+
+    Provides comprehensive styling for various UI components including buttons, fields, labels, treeview elements,
+    and other interface widgets with custom colors, fonts, and layout properties.
+
+    Returns:
+        A style dictionary containing component styling configurations with properties like colors, fonts,
+        backgrounds, and layout settings.
+    """
     style = {
         "Button::reset": {"background_color": 0x0, "border_radius": 1},
         "Button::reset:disabled": {"background_color": 0x0, "color": 0x0, "border_radius": 1},
@@ -204,6 +213,11 @@ def get_style():
         "Rectangle::reset_invalid": {"background_color": 0xFF505050, "border_radius": 1},
         "Rectangle::reset": {"background_color": 0xFFA07D4F, "border_radius": 1},
         "Rectangle::reset:disabled": {"background_color": 0x0, "border_radius": 1},
+        "Rectangle::treeview_item_inapplicable": {
+            "background_color": TREEVIEW_INAPPLICABLE_BG_COLOR,
+            "border_width": 1,
+            "border_color": 0xFF4A4A48,
+        },
         "Rectangle::treeview_item": {
             "background_color": TREEVIEW_BG_COLOR,
             "border_width": 1,

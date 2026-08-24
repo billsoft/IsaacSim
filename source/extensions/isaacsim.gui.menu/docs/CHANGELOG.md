@@ -1,5 +1,88 @@
 # Changelog
 
+## [2.10.5] - 2026-05-19
+### Fixed
+- Help menu: `OpenUSD Reference Guide`, `Warp Getting Started`, and `Warp Documentation` now render reliably in `isaacsim.exp.full.kit`. Previously they bound to `source=` items not provided by the app's dependency closure and rendered as orphan separators. Register the actions and `MenuItemDescription`s locally instead.
+
+## [2.10.4] - 2026-03-16
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [2.10.3] - 2026-03-12
+### Changed
+- Remove unused golden images
+
+## [2.10.2] - 2026-03-10
+### Fixed
+- OMPE-84348: rewrote `_test_environment_menu_option` to not use golden images
+
+## [2.10.1] - 2026-03-05
+### Fixed
+- OMPE-84348: fixed flaky test
+
+## [2.10.0] - 2026-03-04
+### Changed
+- Add Overview.md, python_api.md and update docstrings
+
+## [2.9.0] - 2026-02-27
+### Removed
+- Removed Warp Sample Scenes menu item from Help menu (omni.warp dependency removed)
+
+## [2.8.0] - 2026-02-24
+### Added
+- Robot Self-Collision Detector to Tools > Asset Editors menu
+
+## [2.7.1] - 2026-02-23
+### Changed
+- Add ticked=True to Asset Check menu item
+
+## [2.7.0] - 2026-02-07
+### Changed
+- Remove Asset Browser from menu and context menu
+- Use menu.open_content_browser_to_path to open the Content Browser to a specific path as a replacement
+- Add Utility menu item to check Isaac Sim assets root path
+
+## [2.6.0] - 2026-01-26
+### Changed
+- Fix broken Isaac Sim documentation links
+- Update deprecated onclick_fn to on_click_action
+- Added missing docstrings and cleanup code
+
+## [2.5.3] - 2026-01-24
+### Changed
+- Fix issues with menu click and context menu tests being flaky
+
+## [2.5.2] - 2026-01-22
+### Changed
+- Move menu dictionary to initialize when tests are run rather than at module load time
+
+## [2.5.1] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
+## [2.5.0] - 2025-12-22
+### Changed
+- Refactor test_menu to use isaacsim.test.utils.MenuUITestCase and isaacim.gui.components.create_submenu
+
+### Removed
+- Move sensor menu UI tests to their own extensions
+
+## [2.4.8] - 2025-12-11
+### Changed
+- Update golden image for environment test
+
+## [2.4.7] - 2025-12-07
+### Changed
+- Update description
+
+## [2.4.6] - 2025-11-05
+### Changed
+- Renamed Block World Generator to Heightmap Importer
+
+## [2.4.5] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [2.4.4] - 2025-09-19
 ### Changed
 - Update test to use isaacsim.test.utils for image capture and comparison
@@ -102,7 +185,7 @@
 
 ## [2.2.3] - 2025-04-24
 ### Fixed
-- fixed _build_recent_menu bug
+- Fixed _build_recent_menu bug
 
 ## [2.2.2] - 2025-04-09
 ### Changed
@@ -150,7 +233,7 @@
 
 ## [2.0.10] - 2025-02-03
 ### Fixed
-- updated physics reference link to be based on version automatically and added test
+- Updated physics reference link to be based on version automatically and added test
 
 ## [2.0.9] - 2025-01-26
 ### Changed
@@ -161,11 +244,11 @@
 - Update extension description and add extension specific test settings
 
 ### Fixed
-- security fix to change os.umask(0) to os.umask(0o777)
+- Security fix to change os.umask(0) to os.umask(0o777)
 
 ## [2.0.7] - 2025-01-08
 ### Fixed
-- updated physics reference link
+- Updated physics reference link
 
 ## [2.0.6] - 2024-12-12
 ### Fixed
@@ -210,7 +293,7 @@
 
 ## [1.0.0] - 2024-09-30
 ### Changed
-- extension renamed to isaacsim.gui.menu
+- Extension renamed to isaacsim.gui.menu
 
 ## [0.7.3] - 2024-09-05
 ### Removed
@@ -221,7 +304,7 @@
 - Missing robots to the menu
 
 ### Fixed
-- some naming to match documentation
+- Some naming to match documentation
 
 ## [0.7.1] - 2024-08-26
 ### Added
@@ -258,7 +341,7 @@
 - Added leatherback
 
 ### Fixed
-- broken USD paths
+- Broken USD paths
 
 ## [0.3.1] - 2024-05-11
 ### Changed

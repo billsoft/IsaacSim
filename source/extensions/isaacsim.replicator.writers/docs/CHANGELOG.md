@@ -1,4 +1,63 @@
 # Changelog
+
+## [1.5.4] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings, and update `python_api.md`.
+
+## [1.5.3] - 2026-05-05
+- Enable multitick in all tests
+- Tests now store results in uniquely-named temp directories to avoid run-to-run test pollution
+
+## [1.5.2] - 2026-04-28
+### Fixed
+- `project_pinhole` now returns the screen center for camera points whose homogeneous `w` is near zero, preventing a divide-by-zero crash when projecting points on the camera's projection plane.
+- `invert_fisheye_polynomial` now logs a warning with the residual and iteration count when Newton-Raphson fails to converge within `max_iterations`, instead of silently returning the last iterate.
+
+## [1.5.1] - 2026-04-18
+### Changed
+- Added imperative-mood docstrings and `__all__` definitions
+
+## [1.5.0] - 2026-04-13
+### Changed
+- Migrate extension implementation to core experimental API
+- Mark the `PytorchListener` and `PytorchWriter` implementations as deprecated
+
+## [1.4.1] - 2026-04-11
+### Changed
+- Add omni.kit.viewport.window to test dependencies
+
+## [1.4.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [1.3.2] - 2026-02-18
+### Changed
+- Add WAR to split Windows camera tests into groups to avoid GPU crashes due to descriptor count
+
+## [1.3.1] - 2026-02-06
+### Changed
+- Update deprecated Warp API calls to their updated names
+
+## [1.3.0] - 2026-02-03
+### Changed
+- Added pinholeOpenCV and fisheyePolynomial projection support to pose writer
+- Moved DOPE utils to DOPEWriter class
+
+## [1.2.1] - 2025-12-01
+### Changed
+- Deprecate DOPEWriter and YCBVideoWriter writers
+- Deprecate OgnPose and OgnDope nodes
+
+## [1.2.0] - 2025-11-07
+### Changed
+- Updated pose writer to support explicit backends
+- Updated pose writer tests to use golden images and functional API
+
+## [1.1.0] - 2025-10-27
+### Changed
+- Replace import statements with the deprecation function when importing PyTorch
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [1.0.17] - 2025-09-01
 ### Fixed
 - Make sure custom writers reset annotators list (`self.annotators = []`) on initialization
@@ -74,4 +133,4 @@
 
 ## [1.0.0] - 2024-12-09
 ### Added
-- created extension with writer parts from omni.replicator.isaac
+- Created extension with writer parts from omni.replicator.isaac

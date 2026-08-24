@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +12,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 /*
 Carbonite SDK API:
   https://docs.omniverse.nvidia.com/kit/docs/carbonite/latest/api/carbonite_api.html
@@ -36,8 +37,6 @@ Carbonite SDK API:
 #include <carb/Interface.h>
 
 #include <omni/fabric/RationalTime.h>
-#include <pch/UsdPCH.h>
-#include <pxr/pxr.h>
 
 #include <cstdint>
 #include <functional>
@@ -97,6 +96,18 @@ struct ISimulationManager
      * @brief Resets the simulation manager to its initial state.
      */
     DLL_EXPORT virtual void reset() = 0;
+
+    /**
+     * @brief Removes any tracked physics scenes with invalid prims.
+     * @details
+     * Iterates through the internally tracked physics scenes and removes any
+     * whose underlying USD prim is no longer valid. This handles cases where
+     * physics scene prims become invalid without triggering USD notices
+     * (e.g., layer removal operations).
+     *
+     * @return The paths of physics scenes that were removed.
+     */
+    DLL_EXPORT virtual std::vector<std::string> cleanupInvalidPhysicsScenes() = 0;
 
     /**
      * @brief Gets the current callback iteration counter.
@@ -166,8 +177,8 @@ struct ISimulationManager
     DLL_EXPORT virtual size_t getNumPhysicsSteps() = 0;
 
     /**
-     * @brief Gets the current simulation time.
-     * @return The current simulation time.
+     * @brief Checks if the simulation is currently running.
+     * @return True if simulation is running, false otherwise.
      */
     DLL_EXPORT virtual bool isSimulating() = 0;
 

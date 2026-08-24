@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,5 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Testing framework for validating docstring examples in Isaac Sim modules and extensions."""
+
 from .async_doctest import AsyncDocTestCase
 from .standalone_doctest import StandaloneDocTestCase
+
+__all__ = ["StandaloneDocTestCase", "AsyncDocTestCase"]

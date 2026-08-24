@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2022-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,11 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Verifies that Isaac Sim can launch, run, request quit, and close cleanly inside a child multiprocessing process without hanging on unsaved stage shutdown."""
+
 import multiprocessing
 import sys
 
 
-def run_simulation():
+def run_simulation() -> None:
     """Run the Isaac Sim simulation in a separate process.
 
     This function contains the main simulation logic that will be executed
@@ -27,17 +29,17 @@ def run_simulation():
 
     simulation_app = SimulationApp()
 
+    import isaacsim.core.experimental.utils.app as app_utils
     import omni.kit.app
-    from isaacsim.core.api import World
+    from isaacsim.core.experimental.objects import GroundPlane
 
-    world = World(stage_units_in_meters=1.0, physics_prim_path="/physicsScene", backend="numpy")
-    world.scene.add_default_ground_plane()
-    world.reset()
+    GroundPlane("/World/ground_plane")
+    app_utils.play()
 
     frame_idx = 0
     while simulation_app.is_running():
-        if world.is_playing():
-            world.step(render=True)
+        if app_utils.is_playing():
+            simulation_app.update()
         else:
             simulation_app.update()
             # we should exit this loop before we hit frame 200 unless we are stuck on an exit screen

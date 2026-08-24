@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Demonstrate timeline, physics, render, and app update event subscriptions."""
+
 from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": False})
@@ -22,7 +24,7 @@ import time
 import carb.eventdispatcher
 import carb.settings
 import omni.kit.app
-import omni.physx
+import omni.physics.core
 import omni.timeline
 import omni.usd
 from pxr import PhysxSchema, UsdPhysics
@@ -54,29 +56,32 @@ NUM_APP_UPDATES = 100
 VERBOSE = False
 
 
-def on_timeline_event(event: omni.timeline.TimelineEventType):
+def on_timeline_event(event: carb.eventdispatcher.Event) -> None:
+    """Handle timeline tick events."""
     global timeline_events
-    if event.type == omni.timeline.TimelineEventType.CURRENT_TIME_TICKED.value:
-        timeline_events.append(event.payload)
-        if VERBOSE:
-            print(f"  [timeline][{len(timeline_events)}] {event.payload}")
-
-
-def on_physics_step(dt: float):
-    global physx_events
-    physx_events.append(dt)
+    timeline_events.append(event)
     if VERBOSE:
-        print(f"  [physics][{len(physx_events)}] dt={dt}")
+        print(f"  [timeline][{len(timeline_events)}] {event}")
 
 
-def on_stage_render_event(event: carb.eventdispatcher.Event):
+def on_physics_step(dt: float, context: object) -> None:
+    """Handle physics step events."""
+    global physics_events
+    physics_events.append(dt)
+    if VERBOSE:
+        print(f"  [physics][{len(physics_events)}] dt={dt}")
+
+
+def on_stage_render_event(event: carb.eventdispatcher.Event) -> None:
+    """Handle stage render new frame events."""
     global stage_render_events
     stage_render_events.append(event.event_name)
     if VERBOSE:
         print(f"  [stage render][{len(stage_render_events)}] {event.event_name}")
 
 
-def on_app_update(event: carb.eventdispatcher.Event):
+def on_app_update(event: carb.eventdispatcher.Event) -> None:
+    """Handle application update events."""
     global app_update_events
     app_update_events.append(event.event_name)
     if VERBOSE:
@@ -88,12 +93,14 @@ timeline = omni.timeline.get_timeline_interface()
 
 
 if USE_CUSTOM_TIMELINE_SETTINGS:
-    # Ideal to make simulation and animation synchronized.
+    # When True, the timeline forces `dt = 1 / timeCodesPerSecond` per accepted tick
+    # (ignoring the run loop's measured wall-clock dt). On Play it also overrides
+    # `/app/runLoops/main/rateLimitFrequency` to a value computed from
+    # `targetFramerate` and `timeCodesPerSecond`.
     # Default: True in editor, False in standalone.
     # NOTE:
-    # - It may limit the frame rate (see 'timeline.set_play_every_frame') such that the elapsed wall clock time matches the frame's delta time.
-    # - If the app runs slower than this, animation playback may slow down (see 'CompensatePlayDelayInSecs').
-    # - For performance benchmarks, turn this off or set a very high target in `timeline.set_target_framerate`
+    # - If the app cannot sustain that rate, animation playback may slow down (see 'CompensatePlayDelayInSecs').
+    # - For performance benchmarks, turn this off so the timeline advances by the loop's measured dt.
     carb.settings.get_settings().set("/app/player/useFixedTimeStepping", USE_FIXED_TIME_STEPPING)
 
     # This compensates for frames that require more computation time than the frame's fixed delta time, by temporarily speeding up playback.
@@ -153,7 +160,10 @@ if LIMIT_APP_FPS:
 
     # FPS limit of the main run loop (UI, rendering, etc.)
     # Default: 120
-    # NOTE: disabled if `/app/player/useFixedTimeStepping` is False
+    # NOTE: This caps the loop's tick rate (sleeps at end of frame); it does NOT set the
+    # timeline's per-tick dt. On Play with `/app/player/useFixedTimeStepping=True`,
+    # the timeline computes its own `rateLimitFrequency` from `targetFramerate` and
+    # `timeCodesPerSecond` and overrides this value at that moment.
     carb.settings.get_settings().set("/app/runLoops/main/rateLimitFrequency", int(APP_FPS))
 
 
@@ -170,7 +180,7 @@ print(f"    - Subsample rate: {SUBSAMPLE_RATE}  (/app/player/timelineSubsampleRa
 print(f"    - Play delay compensation: {PLAY_DELAY_COMPENSATION}s  (/app/player/CompensatePlayDelayInSecs)")
 print(f"  Physics:")
 print(f"    - PhysX FPS: {PHYSX_FPS}  (physxScene.timeStepsPerSecond)")
-print(f"    - Min simulation FPS: {MIN_SIM_FPS}  (/persistent/simulation/minFrameRate)")
+print(f"    - PhysX min frame-rate clamp: {MIN_SIM_FPS}  (/persistent/simulation/minFrameRate)")
 print(f"    - Simulations enabled: {not DISABLE_SIMULATIONS}  (/app/player/playSimulations)")
 print(f"  Rendering:")
 print(f"    - App FPS limit: {APP_FPS if LIMIT_APP_FPS else 'unlimited'}  (/app/runLoops/main/rateLimitFrequency)")
@@ -188,9 +198,15 @@ wall_start_time = time.time()
 # Subscribe to events
 print(f"Subscribing to events...")
 timeline_events = []
-timeline_sub = timeline.get_timeline_event_stream().create_subscription_to_pop(on_timeline_event)
-physx_events = []
-physx_sub = omni.physx.get_physx_interface().subscribe_physics_step_events(on_physics_step)
+timeline_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
+    event_name=omni.timeline.GLOBAL_EVENT_CURRENT_TIME_TICKED,
+    on_event=on_timeline_event,
+    observer_name="subscribers_and_events.on_timeline_event",
+)
+physics_events = []
+physics_sub = omni.physics.core.get_physics_simulation_interface().subscribe_physics_on_step_events(
+    pre_step=False, order=0, on_update=on_physics_step
+)
 stage_render_events = []
 stage_render_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
     event_name=omni.usd.get_context().stage_rendering_event_name(omni.usd.StageRenderingEventType.NEW_FRAME, True),
@@ -215,18 +231,12 @@ print(f"Finished running the application for {NUM_APP_UPDATES} updates...")
 
 # Stop timeline and unsubscribe from all events
 timeline.stop()
-if app_sub:
-    app_sub.reset()
-    app_sub = None
-if stage_render_sub:
-    stage_render_sub.reset()
-    stage_render_sub = None
-if physx_sub:
-    physx_sub.unsubscribe()
-    physx_sub = None
-if timeline_sub:
-    timeline_sub.unsubscribe()
-    timeline_sub = None
+app_sub = None
+stage_render_sub = None
+if physics_sub:
+    physics_sub.unsubscribe()
+    physics_sub = None
+timeline_sub = None
 
 
 # Print summary statistics
@@ -234,13 +244,13 @@ print("\nStats:")
 print(f"- App updates: {NUM_APP_UPDATES}")
 print(f"- Wall time: {elapsed_wall_time:.4f} seconds")
 print(f"- Timeline events: {len(timeline_events)}")
-print(f"- Physics events: {len(physx_events)}")
+print(f"- Physics events: {len(physics_events)}")
 print(f"- Stage render events: {len(stage_render_events)}")
 print(f"- App update events: {len(app_update_events)}")
 
 # Calculate and display real-time performance factor
-if len(physx_events) > 0:
-    sim_time = sum(physx_events)
+if len(physics_events) > 0:
+    sim_time = sum(physics_events)
     realtime_factor = sim_time / elapsed_wall_time if elapsed_wall_time > 0 else 0
     print(f"- Simulation time: {sim_time:.4f}s")
     print(f"- Real-time factor: {realtime_factor:.2f}x")

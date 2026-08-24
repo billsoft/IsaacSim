@@ -1,4 +1,4 @@
--- SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+-- SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,9 +29,10 @@ includedirs {
     "include",
     "plugins/isaacsim.core.simulation_manager",
     "%{root}/source/extensions/isaacsim.core.includes/include",
+    "%{root}/source/extensions/omni.kit.loop-isaac/include",
     "%{target_deps}/usd/%{cfg.buildcfg}/include",
     "%{target_deps}/usd/%{cfg.buildcfg}/include/boost",
-    "%{target_deps}/python/include/python3.11",
+    "%{target_deps}/python/include/python3.12",
     "%{kit_sdk_bin_dir}/dev/fabric/include/",
     target_deps .. "/usd_ext_physics/%{cfg.buildcfg}/include",
     target_deps .. "/omni_physics/%{config}/include",
@@ -45,7 +46,7 @@ libdirs {
 }
 links { "physxSchema", "omni.usd", "carb" }
 
-extra_usd_libs = { "usdUtils", "usdPhysics" }
+extra_usd_libs = { "usdGeom", "usdUtils", "usdPhysics", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)
@@ -64,7 +65,7 @@ project_ext_bindings {
     project_name = "isaacsim.core.simulation_manager.python",
     module = "_simulation_manager",
     src = "bindings/isaacsim.core.simulation_manager",
-    target_subdir = "isaacsim/core/simulation_manager",
+    target_subdir = "isaacsim/core/simulation_manager/bindings",
 }
 dependson { "isaacsim.core.simulation_manager.plugin" }
 libdirs {
@@ -88,14 +89,16 @@ libdirs {
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/lib",
 }
 
-extra_usd_libs = { "usdGeom", "usdUtils", "usdPhysics" }
+extra_usd_libs = { "usdGeom", "usdUtils", "usdPhysics", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)
 -- End OpenUSD
 
-filter { "system:linux", "platforms:x86_64" }
+filter { "system:linux", "platforms:x86_64", "configurations:release" }
 links { "tbb" }
+filter { "system:linux", "platforms:x86_64", "configurations:debug" }
+links { "tbb_debug" }
 filter {}
 
 filter { "system:windows", "platforms:x86_64" }

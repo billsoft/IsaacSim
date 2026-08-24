@@ -1,4 +1,29 @@
 # Changelog
+
+## [1.2.3] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings.
+
+## [1.2.2] - 2026-05-13
+### Fixed
+- Fixed nvbug 6107587: the example UI window content overflowed on normal displays, hiding the lower frames. Window content is now wrapped in a `ui.ScrollingFrame` with the vertical scrollbar always on, and the window is given an explicit default `height=600` so the scroll region has a usable bound.
+
+## [1.2.1] - 2026-03-06
+### Fixed
+- Clear per-frame plot update subscription when window is hidden to stop GLOBAL_EVENT_UPDATE callbacks running in the background
+
+## [1.2.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [1.1.10] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
+## [1.1.9] - 2025-12-01
+### Changed
+- Rename startup.py to test_startup.py
+
 ## [1.1.8] - 2025-05-19
 ### Changed
 - Update copyright and license to apache v2.0
@@ -33,7 +58,7 @@
 
 ## [1.1.0] - 2024-10-29
 ### Changed
-- moved menu entry from "Isaac Examples" to "Window->Examples"
+- Moved menu entry from "Isaac Examples" to "Window->Examples"
 
 ## [1.0.1] - 2024-10-24
 ### Changed

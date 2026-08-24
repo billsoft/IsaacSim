@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Module for standalone doctest support in Isaac Sim test environments."""
+
+from __future__ import annotations
+
 import doctest
 import sys
 import unittest
@@ -21,16 +25,55 @@ from . import _doctest
 
 
 class StandaloneDocTestCase(unittest.TestCase):
-    """Base class for all standalone test cases with doctest support for checking docstrings examples
+    """Base class for all standalone test cases with doctest support for checking docstrings examples.
+
+    This class provides methods to validate that code examples in docstrings execute correctly.
+    It is designed for standalone (non-Kit) test environments using Python's unittest framework.
 
     .. note::
 
-        Test methods must start with the ``test_`` prefix
+        Test methods must start with the ``test_`` prefix.
 
-    This class add the following methods:
+    This class adds the following methods:
 
-    * ``assertDocTest``: Check that the examples in docstrings pass for a class/module member
-    * ``assertDocTests``: Check that the examples in docstrings pass for all class/module's members (names)
+    * ``assertDocTest``: Check that the examples in docstrings pass for a class/module member.
+    * ``assertDocTests``: Check that the examples in docstrings pass for all class/module's members.
+
+    **Available Doctest Directives:**
+
+    Use these directives in docstring examples to control test behavior:
+
+    * ``# doctest: +NO_CHECK``: Run the example but skip output verification.
+    * ``# doctest: +SKIP``: Skip this example entirely (don't run it).
+    * ``# doctest: +ELLIPSIS``: Allow ``...`` in expected output to match any substring.
+    * ``# doctest: +NORMALIZE_WHITESPACE``: Ignore whitespace differences.
+
+    **Creating a Test File:**
+
+    To test docstrings for a module or class, create a test file like this:
+
+    .. code-block:: python
+
+        # test_docstrings.py
+        import unittest
+        from isaacsim.test.docstring import StandaloneDocTestCase
+        import my_module
+
+        class TestDocstrings(StandaloneDocTestCase):
+            def test_my_module_docstrings(self):
+                # Test all members of a module
+                self.assertDocTests(my_module)
+
+            def test_single_function(self):
+                # Test a specific function
+                self.assertDocTest(my_module.some_function)
+
+            def test_with_exclusions(self):
+                # Exclude specific members from testing
+                self.assertDocTests(
+                    my_module.MyClass,
+                    exclude=[my_module.MyClass.internal_method]
+                )
 
     Example:
 
@@ -40,24 +83,31 @@ class StandaloneDocTestCase(unittest.TestCase):
         >>> tester = isaacsim.test.docstring.StandaloneDocTestCase()
         >>> tester.__class__.__name__
         'StandaloneDocTestCase'
+
+    Args:
+        *args: Additional positional arguments passed to the parent unittest.TestCase class.
+        **kwargs: Additional keyword arguments passed to the parent unittest.TestCase class.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
         self._doctest_checker = _doctest.DocTest()
 
-    def assertDocTest(
+    def _assert_doc_test_impl(
         self,
         expr: object,
         msg: str = "",
         flags: int = doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS | doctest.FAIL_FAST,
     ) -> None:
-        """Check that the examples in docstrings pass for a class/module member
+        """Check that the examples in docstrings pass for a class/module member.
 
         Args:
-            expr: module function or class definition, property or method to check docstrings examples for
-            msg (str): custom message to display when failing
-            flags (int): doctest's option flags
+            expr: Module function or class definition, property or method to check docstrings examples for.
+            msg: Custom message to display when failing.
+            flags: Doctest's option flags.
+
+        Raises:
+            AssertionError: If examples in docstrings fail.
 
         Example:
 
@@ -72,24 +122,29 @@ class StandaloneDocTestCase(unittest.TestCase):
             sys.tracebacklimit = 0  # don't show test file tracing, only doctest
             self.fail("Examples in docstrings failed" if not msg else msg)
 
-    def assertDocTests(
+    assertDocTest = _assert_doc_test_impl
+
+    def _assert_doc_tests_impl(
         self,
         expr: object,
         msg: str = "",
         flags: int = doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS | doctest.FAIL_FAST,
-        order: list[tuple[object, int]] = [],
-        exclude: list[object] = [],
+        order: list[tuple[object, int]] | None = None,
+        exclude: list[object] | None = None,
         stop_on_failure: bool = False,
     ) -> None:
-        """Check that the examples in docstrings pass for all class/module's members (names)
+        """Check that the examples in docstrings pass for all class/module's members (names).
 
         Args:
-            expr: module or class definition to check members' docstrings examples for
-            msg (str): custom message to display when failing
-            flags (int): doctest's option flags
-            order (list[tuple[object, int]]): list of pair (name, index) to modify the examples execution order
-            exclude (list[object]): list of class/module names to exclude for testing
-            stop_on_failure (bool): stop testing docstrings example at fist encountered failure
+            expr: Module or class definition to check members' docstrings examples for.
+            msg: Custom message to display when failing.
+            flags: Doctest's option flags.
+            order: List of pair (name, index) to modify the examples execution order.
+            exclude: List of class/module names to exclude for testing.
+            stop_on_failure: Stop testing docstrings example at first encountered failure.
+
+        Raises:
+            AssertionError: If some docstring examples fail.
 
         Example:
 
@@ -100,14 +155,17 @@ class StandaloneDocTestCase(unittest.TestCase):
             >>> tester.assertDocTests(StandaloneDocTestCase, exclude=[StandaloneDocTestCase.assertDocTests])
             ... # doctest: +NO_CHECK
         """
+        if order is None:
+            order = []
+        if exclude is None:
+            exclude = []
         objects = self._doctest_checker.get_members(expr, order, exclude, {})
         print(f"class/module members to check: {len(objects)}")
         # test docstrings examples
         failures = 0
         for obj in objects:
-            try:
-                name = obj.__name__
-            except:
+            name = getattr(obj, "__name__", None)
+            if name is None:
                 name = obj.fget.__name__
             print(f"  |-- checking: {name}")
             try:
@@ -120,3 +178,5 @@ class StandaloneDocTestCase(unittest.TestCase):
             self.fail(
                 f"Some tests failed: failed ({failures}), successful ({len(objects) - failures}), total ({len(objects)})"
             )
+
+    assertDocTests = _assert_doc_tests_impl

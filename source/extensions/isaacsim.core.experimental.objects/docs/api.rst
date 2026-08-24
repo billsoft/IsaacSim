@@ -1,5 +1,5 @@
-API
-===
+Python API
+==========
 
 .. warning::
 
@@ -9,14 +9,17 @@ API
 .. contents:: API Content
     :local:
 
-Python API
-----------
-
 .. Summary
 
 The following table summarizes the available objects.
 
 .. currentmodule:: isaacsim.core.experimental.objects
+
+.. rubric:: camera
+.. autosummary::
+    :nosignatures:
+
+    Camera
 
 .. rubric:: ground plane
 .. autosummary::
@@ -57,6 +60,15 @@ The following table summarizes the available objects.
 .. Details
 
 .. API
+
+Camera
+^^^^^^
+
+.. autoclass:: isaacsim.core.experimental.objects.Camera
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :show-inheritance:
 
 Ground Plane
 ^^^^^^^^^^^^

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2022-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,17 +13,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Writer for the DOPE (Deep Object Pose Estimation) dataset format."""
+
 import io
 import json
-from typing import Dict, List
+from typing import Any
 
+import carb
 import numpy as np
 from omni.replicator.core import AnnotatorRegistry, BackendDispatch, Writer, WriterRegistry
 from omni.syntheticdata import SyntheticData
 
-from ..utils import NumpyEncoder
-
 NodeTemplate, NodeConnectionTemplate = SyntheticData.NodeTemplate, SyntheticData.NodeConnectionTemplate
+
+
+class _NumpyEncoder(json.JSONEncoder):
+    """JSON encoder that handles numpy arrays by converting them to lists."""
+
+    def default(self, obj: Any) -> Any:
+        """Serialize numpy arrays to JSON-compatible lists.
+
+        Args:
+            obj: The object to serialize. If it's a numpy array, converts to list.
+
+        Returns:
+            JSON-serializable representation of the object.
+        """
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
 
 __version__ = "0.0.1"
 
@@ -31,39 +50,49 @@ __version__ = "0.0.1"
 class DOPEWriter(Writer):
     """Basic writer capable of writing built-in annotator groundtruth.
 
-    Attributes:
-        output_dir:
-            Output directory string that indicates the directory to save the results. If use_s3 == True, this will be the bucket name.
-        semantic_types:
-            List of semantic types to consider when filtering annotator data. Default: ["class"]
-        image_output_format:
-            String that indicates the format of saved RGB images. Default: "png"
-        use_s3:
-            Boolean value that indicates whether output will be written to s3 bucket. Default: False
+    .. deprecated::
+        This class has been deprecated and will be removed in the next major release.
+
+    Args:
+        output_dir: Output directory string that indicates the directory to save the results.
+            If use_s3 == True, this will be the bucket name.
+        class_name_to_index_map: Dictionary mapping class names to their corresponding indices.
+        semantic_types: List of semantic types to consider when filtering annotator data.
+        image_output_format: String that indicates the format of saved RGB images.
+        use_s3: Boolean value that indicates whether output will be written to s3 bucket.
+        bucket_name: Name of the S3 bucket when using S3 output.
+        endpoint_url: Custom endpoint URL for S3 service.
+        s3_region: AWS region for S3 bucket.
 
     Example:
-        >>> import omni.replicator.core as rep
-        >>> camera = rep.create.camera()
-        >>> render_product = rep.create.render_product(camera, (512, 512))
-        >>> writer = rep.WriterRegistry.get("DOPEWriter")
-        >>> import carb
-        >>> tmp_dir = carb.tokens.get_tokens_interface().resolve("${temp}/rgb")
-        >>> writer.initialize(output_dir=tmp_dir, class_name_to_index_map=class_name_to_index_map)
-        >>> writer.attach([render_product])
-        >>> rep.orchestrator.run()
+        .. code-block:: python
+
+            >>> import omni.replicator.core as rep
+            >>> camera = rep.create.camera()
+            >>> render_product = rep.create.render_product(camera, (512, 512))
+            >>> writer = rep.WriterRegistry.get("DOPEWriter")
+            >>> import carb
+            >>> tmp_dir = carb.tokens.get_tokens_interface().resolve("${temp}/rgb")
+            >>> writer.initialize(output_dir=tmp_dir, class_name_to_index_map=class_name_to_index_map)
+            >>> writer.attach([render_product])
+            >>> rep.orchestrator.run()
     """
 
     def __init__(
         self,
         output_dir: str,
-        class_name_to_index_map: Dict,
-        semantic_types: List[str] = None,
+        class_name_to_index_map: dict,
+        semantic_types: list[str] = None,
         image_output_format: str = "png",
         use_s3: bool = False,
         bucket_name: str = "",
         endpoint_url: str = "",
         s3_region: str = "us-east-1",
-    ):
+    ) -> None:
+        carb.log_warn(
+            "Deprecation warning: DOPEWriter has been deprecated and will be removed in the next major release."
+        )
+
         self._output_dir = output_dir
         self._frame_id = 0
         self._image_output_format = image_output_format
@@ -103,7 +132,12 @@ class DOPEWriter(Writer):
         # Pose Data
         self.annotators.append(AnnotatorRegistry.get_annotator("dope", init_params={"semanticTypes": semantic_types}))
 
-    def register_pose_annotator(config_data: dict):
+    def register_pose_annotator(config_data: dict) -> None:
+        """Register the DOPE pose annotator.
+
+        Args:
+            config_data: General writer configuration used to initialize annotator parameters.
+        """  # noqa: DOC102,DOC103,DOC106
         AnnotatorRegistry.register_annotator_from_node(
             name="DopeSync",
             input_rendervars=[
@@ -159,12 +193,16 @@ class DOPEWriter(Writer):
             else None
         )
 
-    def setup_writer(config_data: dict, writer_config: dict):
-        """Initialize writer and attach render product
+    def setup_writer(config_data: dict, writer_config: dict) -> Any:
+        """Initialize writer and attach render product.
+
         Args:
             config_data: A dictionary containing the general configurations for the script.
             writer_config: A dictionary containing writer-specific configurations.
-        """
+
+        Returns:
+            Initialized DOPE writer instance.
+        """  # noqa: DOC102,DOC103
         writer = WriterRegistry.get("DOPEWriter")
         writer.initialize(
             output_dir=writer_config["output_folder"],
@@ -176,7 +214,7 @@ class DOPEWriter(Writer):
 
         return writer
 
-    def write(self, data: dict):
+    def write(self, data: dict) -> None:
         """Write function called from the OgnWriter node on every frame to process annotator output.
 
         Args:
@@ -186,7 +224,7 @@ class DOPEWriter(Writer):
             print(f"No training data in frame {self._frame_id} (object(s) fully occluded), skipping writing..")
             return
 
-        for annotator in data.keys():
+        for annotator in data:
             annotator_split = annotator.split("-")
             render_product_path = ""
             multi_render_prod = 0
@@ -206,14 +244,14 @@ class DOPEWriter(Writer):
 
         self._frame_id += 1
 
-    def _write_rgb(self, data: dict, render_product_path: str, annotator: str):
-        image_id = "{:06d}".format(self._frame_id)
+    def _write_rgb(self, data: dict, render_product_path: str, annotator: str) -> None:
+        image_id = f"{self._frame_id:06d}"
 
         file_path = f"{render_product_path}{image_id}.{self._image_output_format}"
         self._backend.write_image(file_path, data[annotator])
 
-    def _write_dope(self, data: dict, render_product_path: str, annotator: str):
-        image_id = "{:06d}".format(self._frame_id)
+    def _write_dope(self, data: dict, render_product_path: str, annotator: str) -> None:
+        image_id = f"{self._frame_id:06d}"
 
         dope_data = data[annotator]["data"]
         id_to_labels = data[annotator]["info"]["idToLabels"]
@@ -240,17 +278,17 @@ class DOPEWriter(Writer):
 
         file_path = f"{render_product_path}{image_id}.json"
         buf = io.BytesIO()
-        buf.write(json.dumps(output, indent=2, cls=NumpyEncoder).encode())
+        buf.write(json.dumps(output, indent=2, cls=_NumpyEncoder).encode())
         self._backend.write_blob(file_path, buf.getvalue())
 
     def _check_frame_validity(self, data: dict) -> bool:
         """Check and flag frame as valid if training data is present in the frame.
 
         Args:
-            data (dict): The frame data to check.
+            data: The frame data to check.
 
         Returns:
-            bool: True if frame is valid, False otherwise.
+            True if frame is valid, False otherwise.
         """
         self._last_frame_is_valid = False
         if "dope" in data and "data" in data["dope"]:
@@ -262,9 +300,9 @@ class DOPEWriter(Writer):
         return self._last_frame_is_valid
 
     def is_last_frame_valid(self) -> bool:
-        """Checks if the last frame was valid (training data was present).
+        """Check if the last frame was valid (training data was present).
 
         Returns:
-            bool: True if the last frame was valid, False otherwise.
+            True if the last frame was valid, False otherwise.
         """
         return self._last_frame_is_valid

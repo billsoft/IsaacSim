@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2020-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,7 +31,7 @@ namespace kit
  */
 struct IRunLoopRunnerImpl
 {
-    CARB_PLUGIN_INTERFACE("omni::kit::IRunLoopRunnerImpl", 1, 1);
+    CARB_PLUGIN_INTERFACE("omni::kit::IRunLoopRunnerImpl", 1, 3);
 
     /**
      * @brief Enables or disables manual stepping mode

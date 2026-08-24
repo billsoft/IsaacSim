@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,42 +13,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Verifies that the core archive extension packages all required third-party Python dependencies by importing each dependency in the Kit test environment."""
+
 import omni.kit.test
 
 
 class TestPipArchive(omni.kit.test.AsyncTestCase):
+    """TestPipArchive implementation."""
+
     # import all packages to make sure dependencies were not missed
-    async def test_import_all(self):
+    async def test_import_all(self) -> None:
+        """Verify import all."""
+        import contourpy
         import cycler
-        import gunicorn
-        import jinja2
+        import dateutil
+        import fontTools
         import kiwisolver
         import llvmlite
-        import markupsafe
         import matplotlib
         import nest_asyncio
-        import numba
         import osqp
         import packaging
-        import pint
         import pyparsing
         import pyperclip
         import qdldl
-        import tornado
+        import six
 
-        self.assertIsNotNone(numba)
-        self.assertIsNotNone(llvmlite)
-        self.assertIsNotNone(nest_asyncio)
-        self.assertIsNotNone(jinja2)
-        self.assertIsNotNone(markupsafe)
-        self.assertIsNotNone(matplotlib)
-        self.assertIsNotNone(pyparsing)
+        self.assertIsNotNone(contourpy)
         self.assertIsNotNone(cycler)
+        self.assertIsNotNone(dateutil)
+        self.assertIsNotNone(fontTools)
         self.assertIsNotNone(kiwisolver)
-        self.assertIsNotNone(pint)
-        self.assertIsNotNone(packaging)
-        self.assertIsNotNone(gunicorn)
+        self.assertIsNotNone(llvmlite)
+        self.assertIsNotNone(matplotlib)
+        self.assertIsNotNone(nest_asyncio)
         self.assertIsNotNone(osqp)
-        self.assertIsNotNone(qdldl)
-        self.assertIsNotNone(tornado)
+        self.assertIsNotNone(packaging)
+        self.assertIsNotNone(pyparsing)
         self.assertIsNotNone(pyperclip)
+        self.assertIsNotNone(qdldl)
+        self.assertIsNotNone(six)

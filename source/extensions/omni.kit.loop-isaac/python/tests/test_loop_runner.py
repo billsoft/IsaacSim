@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,14 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test loop runner functionality."""
+
+from typing import Any
+
 import carb
 import omni.kit.test
 
 
 class TestLoopRunner(omni.kit.test.AsyncTestCase):
-    # import all packages to make sure dependencies were not missed
-    async def test_manual_mode(self):
-        import omni.kit.loop._loop as omni_loop
+    """Test cases for the Isaac run loop runner functionality."""
+
+    async def test_manual_mode(self) -> None:
+        """Test enabling and disabling manual stepping mode and verifying dt behavior."""
+        from omni.kit.loop import _loop as omni_loop
 
         _loop_runner = omni_loop.acquire_loop_interface()
         # Manual mode is enabled via carb setting in test settings
@@ -40,7 +46,7 @@ class TestLoopRunner(omni.kit.test.AsyncTestCase):
         # Test that the manual mode is working
         current_dt = 0
 
-        def _render_callback(event):
+        def _render_callback(event: Any) -> None:
             nonlocal current_dt
             current_dt = event.payload["dt"]
             print("render callback", event.payload["dt"])

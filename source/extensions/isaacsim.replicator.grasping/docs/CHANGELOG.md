@@ -1,4 +1,33 @@
 # Changelog
+
+## [1.1.5] - 2026-06-09
+### Fixed
+- Fix linter errors and missing or incomplete docstrings.
+
+## [1.1.4] - 2026-05-11
+### Fixed
+- `get_gripper_joint_states` returns POSIX joint keys on Windows (replaced `os.path.relpath` with a string slice).
+
+## [1.1.3] - 2026-04-28
+### Fixed
+- `simulate_physics_async` and `simulate_physics_with_forces_async` now restore the PhysX scene's original `updateType` (or clear it if it was unauthored) via try/finally, instead of permanently leaving the scene set to `Disabled` after manual stepping.
+
+## [1.1.2] - 2026-04-18
+### Changed
+- Added return type annotations, `from __future__ import annotations`, and imperative-mood docstrings
+
+## [1.1.1] - 2026-03-05
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [1.1.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [1.0.10] - 2026-02-09
+### Fixed
+- Defer `scipy.stats` import in `sampler_utils.py` to avoid module-level import failure under pycoverage
+
 ## [1.0.9] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 1.0.8)

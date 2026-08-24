@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,11 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Utility functions for transforming USD prim locations, orientations, scales, and coordinate spaces."""
+
+from __future__ import annotations
+
 from pxr import Gf, Sdf, Usd, UsdGeom
 
 
 def set_location(prim: Usd.Prim, location: Gf.Vec3d) -> None:
-    """Set the location of the prim, handling translate xformOps."""
+    """Set the location of the prim, handling translate xformOps.
+
+    Args:
+        prim: The USD prim to modify.
+        location: The new location for the prim.
+    """
     xformable = UsdGeom.Xformable(prim)
 
     # Retrieve existing translate ops and set the value to the first one, or add a new one
@@ -42,7 +51,15 @@ def set_location(prim: Usd.Prim, location: Gf.Vec3d) -> None:
 
 
 def set_orientation(prim: Usd.Prim, orientation: Gf.Quatf | Gf.Quatd) -> None:
-    """Set the orientation of the prim, handling orient xformOps."""
+    """Set the orientation of the prim, handling orient xformOps.
+
+    Args:
+        prim: The USD prim to modify.
+        orientation: The new orientation as a quaternion.
+
+    Raises:
+        TypeError: If orientation is not Gf.Quatf or Gf.Quatd.
+    """
     xformable = UsdGeom.Xformable(prim)
 
     # Determine precision based on the type of orientation
@@ -91,7 +108,15 @@ def set_orientation(prim: Usd.Prim, orientation: Gf.Quatf | Gf.Quatd) -> None:
 
 
 def set_rotation(prim: Usd.Prim, rotation: Gf.Vec3f | Gf.Vec3d | Gf.Rotation) -> None:
-    """Set the rotation of the prim, handling rotateXYZ xformOps."""
+    """Set the rotation of the prim, handling rotateXYZ xformOps.
+
+    Args:
+        prim: The USD prim to modify.
+        rotation: The rotation as Euler angles or a Gf.Rotation object.
+
+    Raises:
+        TypeError: If rotation is not Gf.Vec3f, Gf.Vec3d, or Gf.Rotation.
+    """
     xformable = UsdGeom.Xformable(prim)
 
     # Convert Gf.Rotation to Gf.Vec3f euler angles
@@ -134,7 +159,12 @@ def set_rotation(prim: Usd.Prim, rotation: Gf.Vec3f | Gf.Vec3d | Gf.Rotation) ->
 
 
 def set_scale(prim: Usd.Prim, scale: Gf.Vec3f) -> None:
-    """Set the scale of the prim, handling scale xformOps."""
+    """Set the scale of the prim, handling scale xformOps.
+
+    Args:
+        prim: The USD prim to modify.
+        scale: The scale values for each axis.
+    """
     xformable = UsdGeom.Xformable(prim)
 
     # Retrieve existing scale ops and set the value to the first one, or add a new one
@@ -160,7 +190,12 @@ def set_scale(prim: Usd.Prim, scale: Gf.Vec3f) -> None:
 
 
 def set_transform_matrix(prim: Usd.Prim, transform: Gf.Matrix4d) -> None:
-    """Set the transformation matrix of the prim using a transform op."""
+    """Set the transformation matrix of the prim using a transform op.
+
+    Args:
+        prim: The USD prim to modify.
+        transform: The 4x4 transformation matrix to apply.
+    """
     xformable = UsdGeom.Xformable(prim)
 
     # Retrieve existing transform ops and set the value to the first one, or add a new one
@@ -193,7 +228,16 @@ def set_transform_attributes(
     scale: Gf.Vec3f | None = None,
     transform: Gf.Matrix4d | None = None,
 ) -> None:
-    """Set or update the transform attributes of a prim."""
+    """Set or update the transform attributes of a prim.
+
+    Args:
+        prim: The USD prim to modify.
+        location: The location to set.
+        orientation: The orientation quaternion to set.
+        rotation: The rotation to set as Euler angles or Gf.Rotation.
+        scale: The scale values to set.
+        transform: The transformation matrix to set.
+    """
     if transform is not None:
         set_transform_matrix(prim, transform)
 
@@ -211,7 +255,14 @@ def set_transform_attributes(
 
 
 def get_prim_world_pose(prim: Usd.Prim) -> tuple[Gf.Vec3d, Gf.Quatd] | None:
-    """Return the world pose of a USD prim as (Gf.Vec3d, Gf.Quatd)."""
+    """Return the world pose of a USD prim as (Gf.Vec3d, Gf.Quatd).
+
+    Args:
+        prim: The USD prim to get the world pose from.
+
+    Returns:
+        A tuple containing the world position and orientation as (location, orientation).
+    """
     xform_cache = UsdGeom.XformCache()
     world_matrix = xform_cache.GetLocalToWorldTransform(prim).RemoveScaleShear()
     location = world_matrix.ExtractTranslation()
@@ -222,7 +273,15 @@ def get_prim_world_pose(prim: Usd.Prim) -> tuple[Gf.Vec3d, Gf.Quatd] | None:
 def transform_local_poses_to_world(
     poses: list[tuple[Gf.Vec3d, Gf.Quatd]], prim: Usd.Prim
 ) -> list[tuple[Gf.Vec3d, Gf.Quatd]]:
-    """Transform a list of local grasp poses to world poses using the prim's transform."""
+    """Transform a list of local grasp poses to world poses using the prim's transform.
+
+    Args:
+        poses: List of local poses as (location, orientation) tuples.
+        prim: The USD prim providing the transformation reference.
+
+    Returns:
+        List of world poses as (location, orientation) tuples.
+    """
     xform_cache = UsdGeom.XformCache()
     transform_matrix = xform_cache.GetLocalToWorldTransform(prim).RemoveScaleShear()
     world_rotation = transform_matrix.ExtractRotationQuat()
@@ -236,7 +295,15 @@ def transform_local_poses_to_world(
 
 
 def transform_local_pose_to_world(pose: tuple[Gf.Vec3d, Gf.Quatd], prim: Usd.Prim) -> tuple[Gf.Vec3d, Gf.Quatd]:
-    """Transform a local pose to world pose using the prim's transform."""
+    """Transform a local pose to world pose using the prim's transform.
+
+    Args:
+        pose: The local pose as (location, orientation) tuple.
+        prim: The USD prim providing the transformation reference.
+
+    Returns:
+        The world pose as (location, orientation) tuple.
+    """
     xform_cache = UsdGeom.XformCache()
     transform_matrix = xform_cache.GetLocalToWorldTransform(prim).RemoveScaleShear()
     world_rotation = transform_matrix.ExtractRotationQuat()

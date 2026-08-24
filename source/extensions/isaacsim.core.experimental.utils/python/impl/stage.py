@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,19 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Functions for working with USD/USDRT stages."""
+
 from __future__ import annotations
 
 import contextlib
 import threading
-from typing import Generator, Literal
+from collections.abc import Generator
+from typing import Literal
 
 import carb
 import omni.kit.stage_templates
 import omni.usd
+import omni.usd.commands
 import usdrt
 from omni.metrics.assembler.core import get_metrics_assembler_interface
 from pxr import Sdf, Usd, UsdGeom, UsdPhysics, UsdUtils
 
+from . import _templates as stage_templates
 from . import backend as backend_utils
 from . import prim as prim_utils
 
@@ -152,6 +157,60 @@ def get_stage_id(stage: Usd.Stage) -> int:
     return stage_id
 
 
+def generate_stage_representation(mode: Literal["list", "tree"] = "tree") -> str:
+    """Generate a string representation of the stage.
+
+    Args:
+        mode: The mode to use to generate the representation. Available modes are:
+
+            - ``"list"``: List all prims in the stage.
+            - ``"tree"``: Tree representation of the stage.
+
+    Returns:
+        String representation of the stage.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> stage_utils.create_new_stage()  # doctest: +NO_CHECK
+        >>> stage_utils.define_prim("/World/PrimA", type_name="Sphere")  # doctest: +NO_CHECK
+        >>> stage_utils.define_prim("/World/PrimB", type_name="Cube")  # doctest: +NO_CHECK
+        >>> stage_utils.define_prim("/PrimC", type_name="Camera")  # doctest: +NO_CHECK
+        >>>
+        >>> print(stage_utils.generate_stage_representation(mode="list"))
+        /World ()
+        /World/PrimA (Sphere)
+        /World/PrimB (Cube)
+        /PrimC (Camera)
+        >>>
+        >>> print(stage_utils.generate_stage_representation(mode="tree"))
+        / ()
+        ├─ World ()
+        │  ├─ PrimA (Sphere)
+        │  ├─ PrimB (Cube)
+        ├─ PrimC (Camera)
+    """
+
+    def _generate_tree(prim: Usd.Prim, indent: int = 0) -> None:
+        prefix = "│  " * (indent - 1) + "├─ " if indent > 0 else ""
+        lines.append(f"{prefix}{prim.GetPath().name} ({prim.GetTypeName()})")
+        for child in prim.GetChildren():
+            _generate_tree(child, indent + 1)
+
+    lines = []
+    if mode == "list":
+        for prim in get_current_stage().Traverse():
+            lines.append(f"{prim.GetPath().pathString} ({prim.GetTypeName()})")
+    elif mode == "tree":
+        _generate_tree(get_current_stage().GetPrimAtPath("/"), 0)
+    else:
+        raise ValueError(f"Invalid mode: {mode}")
+    return "\n".join(lines)
+
+
 def create_new_stage(*, template: str | None = None) -> Usd.Stage:
     """Create a new USD stage attached to the USD context.
 
@@ -162,7 +221,15 @@ def create_new_stage(*, template: str | None = None) -> Usd.Stage:
         At least the following templates should be available.
         Other templates might be available depending on app customizations.
 
-        .. list-table::
+        .. list-table:: Isaac Sim templates
+            :header-rows: 1
+
+            * - Template
+              - Description
+            * - ``"gridroom"``
+              - Stage with a blue gridroom scene.
+
+        .. list-table:: Kit templates
             :header-rows: 1
 
             * - Template
@@ -189,23 +256,25 @@ def create_new_stage(*, template: str | None = None) -> Usd.Stage:
 
         >>> import isaacsim.core.experimental.utils.stage as stage_utils
         >>>
-        >>> # create a new stage from the 'sunlight' template
-        >>> stage_utils.create_new_stage(template="sunlight")
+        >>> # create a new stage from the 'gridroom' template
+        >>> stage_utils.create_new_stage(template="gridroom")
         Usd.Stage.Open(rootLayer=Sdf.Find('anon:...usd'), ...)
 
-        >>> # get the list of available templates
+        >>> # get the list of available Kit templates
         >>> import omni.kit.stage_templates
         >>>
         >>> [name for item in omni.kit.stage_templates.get_stage_template_list() for name in item]
         ['empty', 'sunlight', 'default stage']
     """
     # create 'empty' stage
-    if template is None:
+    if template in [None, "gridroom"]:
         omni.usd.get_context().new_stage()
+        if template == "gridroom":
+            stage_templates.gridroom()
     # create stage from template
     else:
         templates = [name for item in omni.kit.stage_templates.get_stage_template_list() for name in item]
-        if not template in templates:
+        if template not in templates:
             raise ValueError(f"Template '{template}' not found. Available templates: {templates}")
         omni.kit.stage_templates.new_stage(template=template)
     return omni.usd.get_context().get_stage()
@@ -228,12 +297,14 @@ async def create_new_stage_async(*, template: str | None = None) -> Usd.Stage:
         ValueError: When the template is not found.
     """
     # create 'empty' stage
-    if template is None:
+    if template in [None, "gridroom"]:
         await omni.usd.get_context().new_stage_async()
+        if template == "gridroom":
+            stage_templates.gridroom()
     # create stage from template
     else:
         templates = [name for item in omni.kit.stage_templates.get_stage_template_list() for name in item]
-        if not template in templates:
+        if template not in templates:
             raise ValueError(f"Template '{template}' not found. Available templates: {templates}")
         await omni.kit.stage_templates.new_stage_async(template=template)
     await omni.kit.app.get_app().next_update_async()
@@ -301,7 +372,7 @@ async def open_stage_async(usd_path: str) -> tuple[bool, Usd.Stage | None]:
         raise ValueError(f"The file ({usd_path}) is not USD open-able")
     usd_context = omni.usd.get_context()
     usd_context.disable_save_to_recent_files()
-    (result, error) = await omni.usd.get_context().open_stage_async(usd_path)
+    result, error = await omni.usd.get_context().open_stage_async(usd_path)
     usd_context.enable_save_to_recent_files()
     return result, usd_context.get_stage()
 
@@ -351,7 +422,7 @@ def close_stage() -> bool:
 
 
 def add_reference_to_stage(
-    usd_path: str, path: str, *, prim_type: str = "Xform", variants: list[tuple[str, str]] = []
+    usd_path: str, path: str, *, prim_type: str = "Xform", variants: list[tuple[str, str]] | None = None
 ) -> Usd.Prim:
     """Add a USD file reference to the stage at the specified prim path.
 
@@ -411,12 +482,10 @@ def add_reference_to_stage(
 
             omni.kit.commands.execute("AddReference", stage=stage, prim_path=path, reference=reference)
             reference_added = True
-        except Exception as e:
+        except Exception:
             carb.log_warn(
-                (
-                    f"The USD file ({usd_path}) has divergent units. "
-                    "Enable the omni.usd.metrics.assembler.ui extension or convert the file into right units."
-                )
+                f"The USD file ({usd_path}) has divergent units. "
+                "Enable the omni.usd.metrics.assembler.ui extension or convert the file into right units."
             )
     # add reference (if not already added during divergent units check)
     if not reference_added:
@@ -424,8 +493,22 @@ def add_reference_to_stage(
         if not result:
             raise Exception(f"Unable to add reference to the USD file ({usd_path}).")
     # set variants
+    if variants is None:
+        variants = []
     prim_utils.set_prim_variants(prim, variants=variants)
     return prim
+
+
+def is_stage_loading() -> bool:
+    """Check whether the stage is loading.
+
+    Backends: :guilabel:`usd`.
+
+    Returns:
+        Whether the stage is loading.
+    """
+    # check for total files to be loaded
+    return omni.usd.get_context().get_stage_loading_status()[2] > 0
 
 
 def get_stage_units() -> tuple[float, float]:
@@ -518,8 +601,9 @@ def set_stage_units(*, meters_per_unit: float | None = None, kilograms_per_unit:
     | ounce (oz)       | 0.0283 |
     +------------------+--------+
 
-    Returns:
-        Current stage meters per unit and kilograms per unit.
+    Args:
+        meters_per_unit: Meters per unit.
+        kilograms_per_unit: Kilograms per unit.
 
     Example:
 
@@ -682,6 +766,98 @@ def define_prim(path: str, type_name: str = "Xform") -> Usd.Prim | usdrt.Usd.Pri
             raise RuntimeError(f"A prim already exists at path ({path}) with type ({prim.GetTypeName()})")
         return prim
     return stage.DefinePrim(path, type_name)
+
+
+def delete_prim(prim: str | Usd.Prim) -> bool:
+    """Delete a prim from the stage.
+
+    Backends: :guilabel:`usd`.
+
+    Args:
+        prim: Prim path or prim instance to delete.
+
+    Returns:
+        Whether the prim was deleted successfully.
+
+    Raises:
+        ValueError: If the target prim is not a valid prim.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> stage_utils.define_prim("/World/Sphere", type_name="Sphere")  # doctest: +NO_CHECK
+        >>> stage_utils.delete_prim("/World/Sphere")
+        True
+    """
+    path = prim if isinstance(prim, str) else prim.GetPath().pathString
+    # check if target prim is an existing prim
+    stage = get_current_stage(backend="usd")
+    if not stage.GetPrimAtPath(path).IsValid():
+        raise ValueError(f"Prim at path '{path}' is not a valid prim")
+    omni.usd.commands.DeletePrimsCommand([path]).do()
+    return not stage.GetPrimAtPath(path).IsValid()
+
+
+def move_prim(target: str | Usd.Prim, destination: str | Usd.Prim) -> tuple[bool, str]:
+    """Move a prim to a different location on the stage hierarchy.
+
+    Backends: :guilabel:`usd`.
+
+    The move operation follows the next rules:
+
+    - If the destination exists, the target prim is moved (as a child) into the destination prim.
+      Moved prim keeps its name.
+    - If the destination does not exist, the target prim is moved to the specified destination path,
+      provided that the parent exists (if not, an error is raised). Moved prim is renamed.
+
+    Args:
+        target: Prim path or prim instance to move.
+        destination: Destination path or prim instance to move the prim to.
+
+    Returns:
+        Whether the prim was moved successfully and the new path.
+
+    Raises:
+        ValueError: If the target prim is not a valid prim.
+        ValueError: If the destination path has unexisting parents.
+        ValueError: If the destination path is not a valid path string.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> prim_A = stage_utils.define_prim("/World/A")
+        >>> prim_B = stage_utils.define_prim("/World/B")
+        >>>
+        >>> # move prim A to (into) prim B
+        >>> stage_utils.move_prim(prim_A, prim_B)
+        (True, '/World/B/A')
+        >>> # move prim A next to /World (with name C)
+        >>> stage_utils.move_prim("/World/B/A", "/World/C")
+        (True, '/World/C')
+    """
+    target = Sdf.Path(target) if isinstance(target, str) else target.GetPath()
+    destination = destination if isinstance(destination, str) else destination.GetPath().pathString
+    if not Sdf.Path.IsValidPathString(destination):
+        raise ValueError(f"Destination path '{destination}' is not a valid path string")
+    destination = Sdf.Path(destination)
+    # check if target prim is an existing prim
+    stage = get_current_stage(backend="usd")
+    if not stage.GetPrimAtPath(target).IsValid():
+        raise ValueError(f"Prim at path '{target}' is not a valid prim")
+    # check if the destination is an existing prim
+    if stage.GetPrimAtPath(destination).IsValid():
+        destination = destination.AppendChild(target.name)
+    # check if destination has unexisting parents
+    elif not stage.GetPrimAtPath(destination.GetParentPath()).IsValid():
+        raise ValueError(f"Destination path '{destination}' has unexisting parent '{destination.GetParentPath()}'")
+    # move prim
+    return omni.usd.commands.MovePrimCommand(path_from=target, path_to=destination).do(), destination.pathString
 
 
 def generate_next_free_path(path: str | None = None, *, prepend_default_prim: bool = True) -> str:
